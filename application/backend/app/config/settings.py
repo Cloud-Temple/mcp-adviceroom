@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     # --- Redis ---
     redis_url: str = "redis://redis:6379/0"
 
+    # --- MCP Tools (outils disponibles pour les LLMs pendant le débat) ---
+    mcp_tools_url: str = ""
+    mcp_tools_token: str = ""
+
     # --- Auth ---
     auth_service_url: str = "http://auth:8001"
     jwt_public_key_url: str = "http://auth:8001/.well-known/jwks.json"

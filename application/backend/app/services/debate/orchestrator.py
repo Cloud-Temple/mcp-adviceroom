@@ -36,6 +36,7 @@ from .stability import StabilityDetector, StabilityResult
 from .verdict import VerdictSynthesizer
 from ..llm.base import BaseLLMProvider, LLMResponse
 from ..llm.router import get_llm_router
+from ..tools.executor import get_tool_executor
 from ...config.loader import get_debate_config
 
 logger = logging.getLogger(__name__)
@@ -340,13 +341,24 @@ class DebateOrchestrator:
         """
         Exécute un tour de parole pour un participant.
 
-        Construit le contexte, appelle le LLM, parse la réponse.
+        Construit le contexte, appelle le LLM, gère les tool calls,
+        et parse la réponse finale.
+
+        Pipeline tool call (§9) :
+        1. Appel LLM avec tools disponibles
+        2. Si tool_calls → exécuter via ToolExecutor
+        3. Ajouter les résultats aux messages
+        4. Rappeler le LLM pour la réponse finale
+        Max 3 boucles tool call par tour (sécurité).
 
         Returns:
-            Turn avec contenu et position structurée.
+            Turn avec contenu, position structurée, et tool_calls/results.
         """
+        import json as _json
+
         start_time = time.monotonic()
         router = get_llm_router()
+        tool_executor = get_tool_executor()
         model_cfg = router.get_model_by_id(participant.model_id)
         provider = router.get_provider(participant.provider)
 
@@ -365,19 +377,65 @@ class DebateOrchestrator:
                 participant, debate.question, debate, round_number
             )
 
-        # Appel LLM (non-streaming pour simplifier la v1)
-        response: LLMResponse = await asyncio.wait_for(
-            provider.chat_completion(
-                messages=messages,
-                temperature=0.7,
-                model_override=model_cfg.api_model_id,
-            ),
-            timeout=self._provider_timeout,
-        )
+        # Outils disponibles (format OpenAI function calling)
+        tools = tool_executor.get_tool_definitions() if tool_executor.available else None
+
+        # Boucle appel LLM + tool calls (max 3 itérations)
+        all_tool_calls = []
+        all_tool_results = []
+        max_tool_loops = 3
+
+        for loop_idx in range(max_tool_loops + 1):
+            response: LLMResponse = await asyncio.wait_for(
+                provider.chat_completion(
+                    messages=messages,
+                    tools=tools if loop_idx == 0 else None,  # Tools au 1er appel
+                    temperature=0.7,
+                    model_override=model_cfg.api_model_id,
+                ),
+                timeout=self._provider_timeout,
+            )
+
+            # Si pas de tool calls ou dernière boucle → sortir
+            if not response.tool_calls or loop_idx >= max_tool_loops:
+                break
+
+            # Exécuter les tool calls
+            # Ajouter la réponse assistant avec tool_calls aux messages
+            messages.append({
+                "role": "assistant",
+                "content": response.content or "",
+                "tool_calls": response.tool_calls,
+            })
+
+            for tc in response.tool_calls:
+                tc_id = tc.get("id", f"call_{loop_idx}")
+                tc_name = tc.get("function", {}).get("name", "")
+                tc_args_str = tc.get("function", {}).get("arguments", "{}")
+
+                try:
+                    tc_args = _json.loads(tc_args_str) if isinstance(tc_args_str, str) else tc_args_str
+                except _json.JSONDecodeError:
+                    tc_args = {}
+
+                all_tool_calls.append({"name": tc_name, "arguments": tc_args})
+                logger.info(f"🔧 {participant.id} appelle {tc_name}({tc_args})")
+
+                # Exécuter via le bridge MCP Tools
+                result = await tool_executor.execute_tool_call(tc_name, tc_args)
+                result_str = _json.dumps(result, ensure_ascii=False)[:2000]
+                all_tool_results.append({"name": tc_name, "result": result})
+
+                # Ajouter le résultat au format OpenAI
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc_id,
+                    "content": result_str,
+                })
 
         elapsed_ms = int((time.monotonic() - start_time) * 1000)
 
-        # Parser la réponse
+        # Parser la réponse finale
         prose, position = parse_position(response.content or "")
         tokens = response.usage.get("total_tokens", 0) if response.usage else 0
 
@@ -387,7 +445,8 @@ class DebateOrchestrator:
             phase=phase,
             content=prose,
             structured_position=position,
-            tool_calls=response.tool_calls or [],
+            tool_calls=all_tool_calls,
+            tool_results=all_tool_results,
             tokens_used=tokens,
             duration_ms=elapsed_ms,
         )
