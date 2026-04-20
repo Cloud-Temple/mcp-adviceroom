@@ -56,7 +56,7 @@ sys.path.insert(0, str(ROOT / "application" / "backend"))
 TESTS = [
     {
         "id": "llmaas", "name": "LLMaaS Cloud Temple (SNC)",
-        "key_env": "LLMAAS_API_KEY", "model": "gpt-oss:120b",
+        "key_env": "LLMAAS_API_KEY", "model": "qwen3.5:27b",
         "provider_cls": "app.services.llm.llmaas.LLMaaSProvider",
     },
     {
