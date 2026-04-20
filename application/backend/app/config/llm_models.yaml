@@ -83,10 +83,10 @@ models:
 
   # === Anthropic ===
   claude-opus-46:
-    display_name: "Claude Opus 4.6"
+    display_name: "Claude Opus 4-6"
     provider: anthropic
     category: anthropic
-    api_model_id: "claude-opus-4.6"
+    api_model_id: "claude-opus-4-6"
     capabilities: [chat, tools, streaming]
     context_window: 200000
     default: true

@@ -39,7 +39,8 @@ __all__ = [
 ]
 
 # Chemin par défaut de la config
-_CONFIG_PATH = Path(__file__).parent.parent / "config" / "llm_models.yaml"
+# __file__ = app/services/llm/router.py → remonter 3 niveaux pour atteindre app/
+_CONFIG_PATH = Path(__file__).parent.parent.parent / "config" / "llm_models.yaml"
 
 
 class LLMRouter:
