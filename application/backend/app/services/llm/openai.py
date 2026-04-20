@@ -78,7 +78,8 @@ class OpenAIProvider(BaseLLMProvider):
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
         if max_tokens:
-            payload["max_tokens"] = max_tokens
+            # GPT-5+ utilise max_completion_tokens au lieu de max_tokens
+            payload["max_completion_tokens"] = max_tokens
 
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
@@ -149,7 +150,8 @@ class OpenAIProvider(BaseLLMProvider):
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
         if max_tokens:
-            payload["max_tokens"] = max_tokens
+            # GPT-5+ utilise max_completion_tokens au lieu de max_tokens
+            payload["max_completion_tokens"] = max_tokens
 
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:

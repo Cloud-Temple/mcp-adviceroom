@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["AnthropicProvider"]
 
-_ANTHROPIC_API_BASE = "https://api.anthropic.com/v1"
+_ANTHROPIC_API_BASE = "https://api.anthropic.com"
 _ANTHROPIC_VERSION = "2023-06-01"
 
 
@@ -252,7 +252,7 @@ class AnthropicProvider(BaseLLMProvider):
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
                 response = await client.post(
-                    f"{self.base_url}/messages",
+                    f"{self.base_url}/v1/messages",
                     headers=self._headers(),
                     json=payload,
                 )
@@ -322,7 +322,7 @@ class AnthropicProvider(BaseLLMProvider):
             async with httpx.AsyncClient(timeout=120.0) as client:
                 async with client.stream(
                     "POST",
-                    f"{self.base_url}/messages",
+                    f"{self.base_url}/v1/messages",
                     headers=self._headers(),
                     json=payload,
                 ) as response:
@@ -436,7 +436,7 @@ class AnthropicProvider(BaseLLMProvider):
             # On fait un appel minimal pour tester l'auth.
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.post(
-                    f"{self.base_url}/messages",
+                    f"{self.base_url}/v1/messages",
                     headers=self._headers(),
                     json={
                         "model": self.default_model,
