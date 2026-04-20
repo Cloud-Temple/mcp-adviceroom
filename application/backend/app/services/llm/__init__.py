@@ -5,8 +5,8 @@ Composants :
 - base.py : BaseLLMProvider, LLMResponse, LLMStreamChunk, ModelConfig
 - llmaas.py : LLMaaSProvider (Cloud Temple SecNumCloud)
 - google.py : GoogleProvider (Google Gemini)
-- openai.py : OpenAIProvider (à créer)
-- anthropic.py : AnthropicProvider (à créer)
+- openai.py : OpenAIProvider (OpenAI GPT)
+- anthropic.py : AnthropicProvider (Anthropic Claude)
 - router.py : LLMRouter (routage par catégorie)
 """
 from .base import BaseLLMProvider, LLMResponse, LLMStreamChunk, ModelConfig
