@@ -1,0 +1,64 @@
+# ============================================================
+# AdviceRoom — Docker Compose (5 services)
+# ============================================================
+# Architecture : WAF → Backend (FastAPI + MCP) + Frontend + Auth + Redis
+# Le Backend sert à la fois l'API REST (/api/v1/) et le MCP (/mcp)
+
+services:
+  # --- WAF (Caddy + Coraza) ---
+  waf:
+    build: ./waf
+    ports:
+      - "${WAF_PORT:-443}:443"
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+    volumes:
+      - ./waf/Caddyfile:/etc/caddy/Caddyfile:ro
+
+  # --- Backend (FastAPI + FastMCP) ---
+  backend:
+    build: ./application/backend
+    env_file: .env
+    expose:
+      - "8000"
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # --- Frontend (React + Vite) ---
+  frontend:
+    build: ./application/frontend
+    expose:
+      - "3000"
+    restart: unless-stopped
+
+  # --- Auth Microservice (JWT RS256) ---
+  auth:
+    build: ./application/auth
+    env_file: .env
+    expose:
+      - "8001"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # --- Redis ---
+  redis:
+    image: redis:7-alpine
+    expose:
+      - "6379"
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+volumes:
+  redis_data:

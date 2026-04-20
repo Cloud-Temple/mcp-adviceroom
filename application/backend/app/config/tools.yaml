@@ -1,0 +1,42 @@
+# ============================================================
+# AdviceRoom — Configuration des outils MCP
+# ============================================================
+# Les outils disponibles pour les LLMs participants au débat.
+# Ref: DESIGN/architecture.md §9 (Tool-MAD, arXiv 2601.04742)
+#
+# Principe : tous les LLMs ont accès aux mêmes outils (pas de restriction).
+# Les outils sont exécutés côté serveur via le MCP Tool Pipeline.
+
+# Outils activés pour les participants du débat
+debate_tools:
+  # Recherche internet via Perplexity
+  - id: web_search
+    name: "Recherche internet"
+    description: "Recherche sur internet pour vérifier des faits ou trouver des données récentes."
+    enabled: true
+    provider: perplexity
+    config:
+      detail_level: normal
+
+  # Calculatrice
+  - id: calculator
+    name: "Calculatrice"
+    description: "Évalue des expressions mathématiques (Python math/statistics)."
+    enabled: true
+    provider: builtin
+
+  # Date / heure
+  - id: datetime
+    name: "Date et heure"
+    description: "Récupère la date/heure actuelle ou effectue des calculs de dates."
+    enabled: true
+    provider: builtin
+
+# Configuration globale des outils
+settings:
+  # Timeout par appel outil (secondes)
+  tool_timeout: 30
+  # Nombre max d'appels outils par tour par participant
+  max_tool_calls_per_turn: 3
+  # Si un outil échoue, le débat continue (graceful degradation)
+  fail_open: true

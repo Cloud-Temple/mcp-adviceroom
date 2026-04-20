@@ -1,0 +1,46 @@
+# ============================================================
+# AdviceRoom — .gitignore
+# ============================================================
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+venv/
+.venv/
+env/
+.env
+
+# --- Node.js ---
+node_modules/
+dist/
+.DS_Store
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Docker ---
+docker-compose.override.yml
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Test ---
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Secrets ---
+.env
+*.pem
+*.key

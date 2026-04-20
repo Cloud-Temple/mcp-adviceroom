@@ -1,0 +1,104 @@
+# ============================================================
+# Registre des modèles LLM — AdviceRoom v0.1.0
+# ============================================================
+# Rechargeable à chaud via l'admin API.
+# Le modèle "default: true" est utilisé quand l'utilisateur
+# choisit la catégorie sans spécifier de modèle.
+#
+# Catégories :
+#   snc      — Modèles SecNumCloud (Cloud Temple LLMaaS)
+#   openai   — Modèles OpenAI
+#   anthropic — Modèles Anthropic
+#   google   — Modèles Google Gemini
+#
+# Capabilities :
+#   chat, tools, vision, streaming
+# ============================================================
+
+# Catégorie par défaut
+default_category: snc
+
+# --- Catégories ---
+categories:
+  snc:
+    display_name: "SecNumCloud (LLMaaS)"
+    description: "Modèles Cloud Temple qualifiés SecNumCloud"
+    icon: "🛡️"
+  openai:
+    display_name: "OpenAI"
+    description: "Modèles OpenAI (cloud public)"
+    icon: "🟢"
+  anthropic:
+    display_name: "Anthropic"
+    description: "Modèles Anthropic Claude (cloud public)"
+    icon: "🟠"
+  google:
+    display_name: "Google"
+    description: "Modèles Google Gemini (cloud public)"
+    icon: "🔵"
+
+# --- Modèles ---
+models:
+  # === SecNumCloud (LLMaaS) ===
+  gpt-oss-120b:
+    display_name: "GPT-OSS 120B"
+    provider: llmaas
+    category: snc
+    api_model_id: "gpt-oss:120b"
+    capabilities: [chat, tools, streaming]
+    context_window: 131072
+    default: true
+    active: true
+
+  qwen35-27b:
+    display_name: "Qwen 3.5 27B"
+    provider: llmaas
+    category: snc
+    api_model_id: "Qwen/Qwen3.5-27B-GPTQ-Int4"
+    capabilities: [chat, tools, streaming]
+    context_window: 131072
+    default: false
+    active: true
+
+  gemma4-31b:
+    display_name: "Gemma 4 31B"
+    provider: llmaas
+    category: snc
+    api_model_id: "google/gemma-4-31b-it"
+    capabilities: [chat, streaming]
+    context_window: 131072
+    default: false
+    active: true
+
+  # === OpenAI ===
+  gpt-52:
+    display_name: "GPT-5.2"
+    provider: openai
+    category: openai
+    api_model_id: "gpt-5.2"
+    capabilities: [chat, tools, streaming]
+    context_window: 128000
+    default: true
+    active: true
+
+  # === Anthropic ===
+  claude-opus-46:
+    display_name: "Claude Opus 4.6"
+    provider: anthropic
+    category: anthropic
+    api_model_id: "claude-opus-4.6"
+    capabilities: [chat, tools, streaming]
+    context_window: 200000
+    default: true
+    active: true
+
+  # === Google ===
+  gemini-31-pro:
+    display_name: "Gemini 3.1 Pro"
+    provider: google
+    category: google
+    api_model_id: "gemini-3.1-pro-preview"
+    capabilities: [chat, tools, streaming]
+    context_window: 1048576
+    default: true
+    active: true

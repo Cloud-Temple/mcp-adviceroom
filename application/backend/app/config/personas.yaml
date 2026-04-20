@@ -1,0 +1,43 @@
+# ============================================================
+# AdviceRoom — Personas et attribution automatique
+# ============================================================
+# Ref: DESIGN/architecture.md §12.3
+
+# Définition de chaque persona
+definitions:
+  pragmatique:
+    name: "Pragmatique"
+    description: "Analyse coût-bénéfice, faisabilité, contraintes opérationnelles. Cherche la solution la plus réaliste."
+    icon: "💼"
+    color: "#4CAF50"
+
+  analyste_risques:
+    name: "Analyste risques"
+    description: "Identifie les risques, les edge cases, les scénarios d'échec. Challenge les hypothèses optimistes."
+    icon: "⚠️"
+    color: "#FF9800"
+
+  expert_technique:
+    name: "Expert technique"
+    description: "Plonge dans les détails techniques, la faisabilité d'implémentation, les trade-offs architecturaux."
+    icon: "🔧"
+    color: "#2196F3"
+
+  avocat_du_diable:
+    name: "Avocat du diable"
+    description: "Conteste systématiquement la position dominante. Cherche les failles, les alternatives non considérées."
+    icon: "😈"
+    color: "#F44336"
+
+  visionnaire:
+    name: "Visionnaire"
+    description: "Pense long terme, innovation, tendances. Propose des approches non conventionnelles."
+    icon: "🔮"
+    color: "#9C27B0"
+
+# Attribution automatique selon le nombre de participants
+auto_assignment:
+  2: [pragmatique, avocat_du_diable]
+  3: [pragmatique, analyste_risques, expert_technique]
+  4: [pragmatique, analyste_risques, expert_technique, avocat_du_diable]
+  5: [pragmatique, analyste_risques, expert_technique, avocat_du_diable, visionnaire]

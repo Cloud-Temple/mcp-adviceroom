@@ -1,0 +1,51 @@
+# ============================================================
+# AdviceRoom — Paramètres du protocole de débat
+# ============================================================
+# Ref: DESIGN/architecture.md §12.4
+
+# Limites du débat
+limits:
+  max_participants: 5             # Max LLMs invités (hors synthétiseur)
+  max_rounds: 5                   # Max rounds de débat (Phase 2)
+  min_rounds: 2                   # Min rounds avant arrêt adaptatif
+
+# Détection de stabilité (§13)
+stability:
+  threshold: 0.85                 # Score minimum pour considérer le débat stable
+  weights:
+    position_delta: 0.5           # Poids du changement de position
+    confidence_delta: 0.3         # Poids de la variation de confidence
+    argument_novelty: 0.2         # Poids des nouveaux arguments
+  confidence_instability_threshold: 30  # Variation > 30 points = instable
+
+# Anti-conformité (§14)
+anti_conformity:
+  challenge_min_length: 20        # Longueur min du challenge_reason (chars)
+  substantive_min_length: 50      # Longueur min pour être "substantive"
+  max_retries: 1                  # Nombre de retry si pas de challenge
+
+# Gestion des erreurs (§15)
+error_handling:
+  provider_timeout_seconds: 60    # Timeout par appel LLM
+  provider_max_retries: 1         # Retries avant skip
+  rate_limit_backoff: [2, 4, 8]   # Backoff exponentiel (secondes)
+  rate_limit_max_retries: 3       # Max retries sur 429
+  skip_threshold: 3               # Rounds consécutifs skipés → retrait
+  min_active_participants: 2      # En dessous → état error
+  user_question_timeout_minutes: 30  # Timeout question utilisateur
+
+# Context window (§16)
+context:
+  sliding_window_rounds: 2        # Nombre de rounds récents en entier
+  summary_tokens_per_participant: 200  # Tokens par participant dans les résumés
+  response_reserve_ratio: 0.38    # % de la fenêtre réservé pour la réponse
+  protected_zone_tokens: 12000    # Tokens protégés (system prompt, question, etc.)
+
+# Synthétiseur
+synthesizer:
+  default_model: "claude-opus-46" # Modèle par défaut pour le verdict
+  fallback_model: "gpt-52"       # Fallback si le premier échoue
+
+# Streaming
+streaming:
+  chunk_flush_interval_ms: 50     # Intervalle entre flush des chunks NDJSON
