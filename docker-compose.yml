@@ -1,56 +1,85 @@
 # ============================================================
-# AdviceRoom — Docker Compose (5 services)
+# AdviceRoom — Docker Compose
 # ============================================================
-# Architecture : WAF → Backend (FastAPI + MCP) + Frontend + Auth + Redis
-# Le Backend sert à la fois l'API REST (/api/v1/) et le MCP (/mcp)
+# Architecture : WAF → Backend (FastAPI + MCP) + Frontend
+#
+# Le Backend sert à la fois l'API REST (/api/v1/) et le MCP (/mcp).
+# Le WAF (Caddy) fait le reverse proxy HTTPS vers backend + frontend.
+#
+# Services actifs : WAF, Backend, Frontend, Redis (4 services)
+# Service prévu : Auth microservice (Phase 3 — Sécurité)
+#
+# Usage :
+#   docker compose up --build        # Lancer tout le stack
+#   docker compose up backend redis  # Backend seul (dev)
+#   docker compose logs -f backend   # Suivre les logs backend
 
 services:
-  # --- WAF (Caddy + Coraza) ---
+
+  # ---------------------------------------------------------
+  # WAF (Caddy) — Reverse proxy + TLS
+  # ---------------------------------------------------------
+  # Route /api/* et /mcp* → backend:8000
+  # Route /* → frontend:3000
   waf:
     build: ./waf
     ports:
       - "${WAF_PORT:-443}:443"
       - "80:80"
     depends_on:
-      - backend
-      - frontend
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
     restart: unless-stopped
     volumes:
       - ./waf/Caddyfile:/etc/caddy/Caddyfile:ro
 
-  # --- Backend (FastAPI + FastMCP) ---
+  # ---------------------------------------------------------
+  # Backend (FastAPI + FastMCP)
+  # ---------------------------------------------------------
+  # API REST : /api/v1/
+  # MCP :      /mcp
+  # Health :   /health
   backend:
     build: ./application/backend
     env_file: .env
+    ports:
+      - "8000:8000"   # Accès direct (dev/debug)
     expose:
       - "8000"
     depends_on:
-      - redis
+      redis:
+        condition: service_started
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
+      interval: 15s
       timeout: 5s
       retries: 3
+      start_period: 10s
 
-  # --- Frontend (React + Vite) ---
+  # ---------------------------------------------------------
+  # Frontend (React + Vite → nginx)
+  # ---------------------------------------------------------
+  # Build multi-stage : Vite build → nginx sur port 3000
   frontend:
     build: ./application/frontend
+    ports:
+      - "3000:3000"   # Accès direct (dev/debug)
     expose:
       - "3000"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
-  # --- Auth Microservice (JWT RS256) ---
-  auth:
-    build: ./application/auth
-    env_file: .env
-    expose:
-      - "8001"
-    depends_on:
-      - redis
-    restart: unless-stopped
-
-  # --- Redis ---
+  # ---------------------------------------------------------
+  # Redis — Cache et files d'attente
+  # ---------------------------------------------------------
   redis:
     image: redis:7-alpine
     expose:
@@ -59,6 +88,25 @@ services:
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+
+  # ---------------------------------------------------------
+  # Auth Microservice (Phase 3 — pas encore implémenté)
+  # ---------------------------------------------------------
+  # Décommenter quand le service auth sera développé.
+  # auth:
+  #   build: ./application/auth
+  #   env_file: .env
+  #   expose:
+  #     - "8001"
+  #   depends_on:
+  #     redis:
+  #       condition: service_started
+  #   restart: unless-stopped
 
 volumes:
   redis_data:

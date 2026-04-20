@@ -1,0 +1,6 @@
+# Exclure les fichiers inutiles du build Docker
+node_modules
+dist
+.git
+.gitignore
+*.md

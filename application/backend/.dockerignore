@@ -1,0 +1,8 @@
+# Exclure les fichiers inutiles du build Docker
+__pycache__
+*.pyc
+.pytest_cache
+.git
+*.md
+.env
+venv
