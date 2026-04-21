@@ -26,8 +26,8 @@ anti_conformity:
 
 # Gestion des erreurs (§15)
 error_handling:
-  provider_timeout_seconds: 60    # Timeout par appel LLM
-  provider_max_retries: 1         # Retries avant skip
+  provider_timeout_seconds: 180   # Timeout par appel LLM (180s pour les gros modèles avec tool calls)
+  provider_max_retries: 3         # Retries avant skip (3 tentatives sur réponse vide)
   rate_limit_backoff: [2, 4, 8]   # Backoff exponentiel (secondes)
   rate_limit_max_retries: 3       # Max retries sur 429
   skip_threshold: 3               # Rounds consécutifs skipés → retrait

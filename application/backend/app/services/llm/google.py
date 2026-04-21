@@ -256,6 +256,9 @@ class GoogleProvider(BaseLLMProvider):
                         "name": fc.get("name", ""),
                         "arguments": json.dumps(fc.get("args", {})),
                     },
+                    # Préserver le part Google brut (avec thought_signature)
+                    # pour la ré-entrance dans _openai_messages_to_google
+                    "_google_raw_part": part,
                 })
 
         # Mapping finish_reason Google → OpenAI
@@ -328,7 +331,7 @@ class GoogleProvider(BaseLLMProvider):
             }
 
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=180.0) as client:
                 response = await client.post(
                     self._url(model, "generateContent"),
                     headers=self._headers(),
@@ -401,7 +404,7 @@ class GoogleProvider(BaseLLMProvider):
         tool_call_index = 0
 
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=180.0) as client:
                 url = self._url(model, "streamGenerateContent") + "&alt=sse"
 
                 # Debug : log du payload pour diagnostiquer les 400

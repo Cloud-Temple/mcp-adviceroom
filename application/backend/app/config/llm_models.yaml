@@ -54,9 +54,9 @@ models:
     display_name: "Qwen 3.5 27B"
     provider: llmaas
     category: snc
-    api_model_id: "Qwen/Qwen3.5-27B-GPTQ-Int4"
+    api_model_id: "qwen3.5:27b"
     capabilities: [chat, tools, streaming]
-    context_window: 131072
+    context_window: 1000000
     default: false
     active: true
 
@@ -64,9 +64,9 @@ models:
     display_name: "Gemma 4 31B"
     provider: llmaas
     category: snc
-    api_model_id: "google/gemma-4-31b-it"
+    api_model_id: "gemma4:31b"
     capabilities: [chat, streaming]
-    context_window: 131072
+    context_window: 250000
     default: false
     active: true
 

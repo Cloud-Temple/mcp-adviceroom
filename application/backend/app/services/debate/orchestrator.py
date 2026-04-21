@@ -14,6 +14,7 @@ Il ne gère PAS le HTTP — c'est le rôle des routers.
 Ref: DESIGN/architecture.md §3 (Protocole), §14 (Anti-conformité), §15 (Erreurs)
 """
 import asyncio
+import collections
 import logging
 import time
 from typing import Any, AsyncGenerator, Dict, List, Optional
@@ -42,6 +43,54 @@ from ...config.loader import get_debate_config
 logger = logging.getLogger(__name__)
 
 __all__ = ["DebateOrchestrator"]
+
+# Ring buffer global pour l'activité LLM (accessible depuis l'admin API)
+_llm_activity_log = collections.deque(maxlen=500)
+
+
+def get_llm_activity_log() -> list:
+    """Retourne l'activité LLM récente (plus récent en premier)."""
+    return list(reversed(_llm_activity_log))
+
+
+def _log_llm_activity(
+    event_type: str,
+    debate_id: str = "",
+    participant_id: str = "",
+    model_id: str = "",
+    provider: str = "",
+    persona: str = "",
+    phase: str = "",
+    round_number: int = 0,
+    tokens: int = 0,
+    duration_ms: int = 0,
+    status: str = "ok",
+    error: str = "",
+    thesis: str = "",
+    confidence: int = 0,
+    tool_calls: int = 0,
+    details: str = "",
+):
+    """Enregistre un événement dans le log d'activité LLM."""
+    _llm_activity_log.append({
+        "timestamp": time.time(),
+        "type": event_type,
+        "debate_id": debate_id[:8] if debate_id else "",
+        "participant": participant_id,
+        "model": model_id,
+        "provider": provider,
+        "persona": persona,
+        "phase": phase,
+        "round": round_number,
+        "tokens": tokens,
+        "duration_ms": duration_ms,
+        "status": status,
+        "error": error[:150] if error else "",
+        "thesis": thesis[:100] if thesis else "",
+        "confidence": confidence,
+        "tool_calls": tool_calls,
+        "details": details[:200] if details else "",
+    })
 
 
 class DebateOrchestrator:
@@ -73,7 +122,8 @@ class DebateOrchestrator:
         self._max_participants: int = limits.get("max_participants", 5)
 
         errors = self._config.get("error_handling", {})
-        self._provider_timeout: int = errors.get("provider_timeout_seconds", 60)
+        self._provider_timeout: int = errors.get("provider_timeout_seconds", 120)
+        self._provider_max_retries: int = errors.get("provider_max_retries", 2)
         self._skip_threshold: int = errors.get("skip_threshold", 3)
         self._min_active: int = errors.get("min_active_participants", 2)
 
@@ -174,7 +224,9 @@ class DebateOrchestrator:
 
             debate.status = DebateStatus.COMPLETED
             yield {"type": "debate_end", "debate_id": debate.id,
-                   "status": "completed"}
+                   "status": "completed",
+                   "rounds": len(debate.rounds),
+                   "total_tokens": debate.total_tokens}
 
         except Exception as e:
             logger.error(f"✗ Erreur fatale dans le débat : {e}")
@@ -191,17 +243,24 @@ class DebateOrchestrator:
         debate.phase = DebatePhase.OPENING
         yield {"type": "phase", "phase": "opening", "round": 0}
 
-        n = len(debate.participants)
+        active = [p for p in debate.participants if p.active]
+
+        # Émettre turn_start pour tous les participants (parallèle)
+        for p in active:
+            yield {"type": "turn_start",
+                   "participant": self._participant_info(p),
+                   "round": 0, "phase": "opening"}
+
         tasks = [
             self._run_single_turn(p, debate, round_number=0, phase=DebatePhase.OPENING)
-            for p in debate.participants if p.active
+            for p in active
         ]
 
         # Exécution en PARALLÈLE (anti-ancrage — §3.2)
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for i, result in enumerate(results):
-            participant = debate.participants[i]
+            participant = active[i]
             if isinstance(result, Exception):
                 logger.error(f"✗ Opening échoué pour {participant.id}: {result}")
                 turn = Turn(
@@ -212,9 +271,33 @@ class DebateOrchestrator:
                 turn = result
 
             debate.opening_turns.append(turn)
-            yield {"type": "turn_end", "participant_id": participant.id,
-                   "phase": "opening", "round": 0,
-                   "has_position": turn.structured_position is not None}
+            debate.total_tokens += turn.tokens_used
+
+            # Événement enrichi avec contenu, tokens, durée, position
+            event: Dict[str, Any] = {
+                "type": "turn_end",
+                "participant_id": participant.id,
+                "participant": self._participant_info(participant),
+                "phase": "opening",
+                "round": 0,
+                "content": turn.content,
+                "tokens_used": turn.tokens_used,
+                "duration_ms": turn.duration_ms,
+                "has_position": turn.structured_position is not None,
+            }
+            if turn.structured_position:
+                event["position"] = {
+                    "thesis": turn.structured_position.thesis,
+                    "confidence": turn.structured_position.confidence,
+                    "arguments": turn.structured_position.arguments,
+                }
+            if turn.error:
+                event["error"] = turn.error
+            if turn.tool_calls:
+                event["tool_calls"] = turn.tool_calls
+            if turn.tool_results:
+                event["tool_results"] = turn.tool_results
+            yield event
 
     # ============================================================
     # Phase 2 — DEBATE (round-robin séquentiel)
@@ -287,11 +370,36 @@ class DebateOrchestrator:
                             f"{self._skip_threshold} rounds skipés"
                         )
 
-                yield {"type": "turn_end", "participant_id": participant.id,
-                       "round": round_num,
-                       "has_position": bool(
-                           rnd.turns and rnd.turns[-1].structured_position
-                       )}
+                # Événement enrichi avec contenu, tokens, durée, position
+                last_turn = rnd.turns[-1] if rnd.turns else None
+                te: Dict[str, Any] = {
+                    "type": "turn_end",
+                    "participant_id": participant.id,
+                    "participant": self._participant_info(participant),
+                    "round": round_num,
+                    "has_position": bool(last_turn and last_turn.structured_position),
+                }
+                if last_turn:
+                    te["content"] = last_turn.content
+                    te["tokens_used"] = last_turn.tokens_used
+                    te["duration_ms"] = last_turn.duration_ms
+                    debate.total_tokens += last_turn.tokens_used
+                    if last_turn.structured_position:
+                        pos = last_turn.structured_position
+                        te["position"] = {
+                            "thesis": pos.thesis,
+                            "confidence": pos.confidence,
+                            "arguments": pos.arguments,
+                            "challenged": pos.challenged,
+                            "challenge_reason": pos.challenge_reason,
+                        }
+                    if last_turn.error:
+                        te["error"] = last_turn.error
+                    if last_turn.tool_calls:
+                        te["tool_calls"] = last_turn.tool_calls
+                    if last_turn.tool_results:
+                        te["tool_results"] = last_turn.tool_results
+                yield te
 
             debate.rounds.append(rnd)
 
@@ -324,6 +432,18 @@ class DebateOrchestrator:
                "divergence_points": verdict.divergence_points,
                "recommendation": verdict.recommendation,
                "key_insights": verdict.key_insights}
+
+        # Log verdict LLM
+        _log_llm_activity(
+            event_type="verdict",
+            debate_id=debate.id,
+            model_id=verdict.synthesizer_model or "",
+            tokens=verdict.tokens_used,
+            duration_ms=verdict.duration_ms,
+            status="ok" if verdict.type.value != "error" else "error",
+            confidence=verdict.confidence,
+            details=f"{verdict.type.value} — {(verdict.summary or '')[:100]}",
+        )
 
         debate.phase = DebatePhase.COMPLETED
 
@@ -380,16 +500,18 @@ class DebateOrchestrator:
         # Outils disponibles (format OpenAI function calling)
         tools = tool_executor.get_tool_definitions() if tool_executor.available else None
 
-        # Boucle appel LLM + tool calls (max 3 itérations)
+        # Boucle appel LLM + tool calls
+        # Opus fait souvent des chaînes de tool calls (web_search x2, datetime, etc.)
+        # On laisse le modèle faire ses tool calls autant qu'il veut (limite haute de sécurité)
         all_tool_calls = []
         all_tool_results = []
-        max_tool_loops = 3
+        max_tool_loops = 10
 
         for loop_idx in range(max_tool_loops + 1):
             response: LLMResponse = await asyncio.wait_for(
                 provider.chat_completion(
                     messages=messages,
-                    tools=tools if loop_idx == 0 else None,  # Tools au 1er appel
+                    tools=tools,  # Toujours passer les tools — Anthropic l'exige quand les messages contiennent des tool_use/tool_result blocks
                     temperature=0.7,
                     model_override=model_cfg.api_model_id,
                 ),
@@ -434,17 +556,103 @@ class DebateOrchestrator:
                 })
 
         elapsed_ms = int((time.monotonic() - start_time) * 1000)
+        tokens = response.usage.get("total_tokens", 0) if response.usage else 0
+        raw_content = response.content or ""
+
+        # Détecter les réponses vides → retry avec backoff généreux (§15)
+        # IMPORTANT : une réponse avec tool_calls mais sans texte n'est PAS vide !
+        # Le modèle veut utiliser ses tools — c'est une réponse valide.
+        # On ne retry que si il n'y a NI texte NI tool_calls.
+        has_tool_calls = bool(response.tool_calls)
+        if not raw_content.strip() and not has_tool_calls:
+            max_retries = max(self._provider_max_retries, 5)  # Au moins 5 retries
+            for retry_num in range(1, max_retries + 1):
+                backoff_seconds = retry_num * 15  # 15s, 30s, 45s, 60s, 75s
+                logger.warning(
+                    f"⚠ Réponse vide de {participant.id} (round {round_number}) "
+                    f"— retry {retry_num}/{max_retries} après {backoff_seconds}s"
+                )
+                await asyncio.sleep(backoff_seconds)
+
+                try:
+                    retry_response: LLMResponse = await asyncio.wait_for(
+                        provider.chat_completion(
+                            messages=messages,
+                            tools=tools,  # Anthropic exige les tools quand les messages contiennent des tool_use/tool_result blocks
+                            temperature=0.7,
+                            model_override=model_cfg.api_model_id,
+                        ),
+                        timeout=self._provider_timeout,
+                    )
+                    retry_content = retry_response.content or ""
+                    if retry_content.strip():
+                        # Retry réussi !
+                        logger.info(
+                            f"✓ Retry {retry_num} réussi pour {participant.id}"
+                        )
+                        elapsed_ms = int((time.monotonic() - start_time) * 1000)
+                        retry_tokens = retry_response.usage.get("total_tokens", 0) if retry_response.usage else 0
+                        tokens += retry_tokens
+                        raw_content = retry_content
+                        break
+                except Exception as e:
+                    logger.warning(f"⚠ Retry {retry_num} échoué pour {participant.id}: {e}")
+            else:
+                # Tous les retries épuisés → erreur
+                elapsed_ms = int((time.monotonic() - start_time) * 1000)
+                logger.error(
+                    f"✗ Réponse vide persistante de {participant.id} "
+                    f"après {self._provider_max_retries} retries ({elapsed_ms}ms)"
+                )
+                # Log erreur LLM
+                _log_llm_activity(
+                    event_type="turn", debate_id=debate.id,
+                    participant_id=participant.id, model_id=participant.model_id,
+                    provider=participant.provider, persona=participant.persona_name,
+                    phase=phase.value, round_number=round_number,
+                    tokens=tokens, duration_ms=elapsed_ms,
+                    status="error", error=f"Réponse vide après {self._provider_max_retries} retries",
+                )
+                return Turn(
+                    participant_id=participant.id,
+                    round_number=round_number,
+                    phase=phase,
+                    content="",
+                    structured_position=None,
+                    tool_calls=all_tool_calls,
+                    tool_results=all_tool_results,
+                    tokens_used=tokens,
+                    duration_ms=elapsed_ms,
+                    error=f"Réponse vide du modèle {participant.model_id} après {self._provider_max_retries} retries ({elapsed_ms}ms)",
+                )
 
         # Parser la réponse finale
-        prose, position = parse_position(response.content or "")
-        tokens = response.usage.get("total_tokens", 0) if response.usage else 0
+        prose, position = parse_position(raw_content)
+
+        # Log activité LLM
+        _log_llm_activity(
+            event_type="turn",
+            debate_id=debate.id,
+            participant_id=participant.id,
+            model_id=participant.model_id,
+            provider=participant.provider,
+            persona=participant.persona_name,
+            phase=phase.value,
+            round_number=round_number,
+            tokens=tokens,
+            duration_ms=elapsed_ms,
+            status="ok" if position else "no_position",
+            thesis=position.thesis if position else "",
+            confidence=position.confidence if position else 0,
+            tool_calls=len(all_tool_calls),
+        )
 
         return Turn(
             participant_id=participant.id,
             round_number=round_number,
             phase=phase,
             content=prose,
-            structured_position=position,
+            structured_position=position,  # peut être None si parsing échoue
             tool_calls=all_tool_calls,
             tool_results=all_tool_results,
             tokens_used=tokens,
@@ -498,8 +706,13 @@ class DebateOrchestrator:
                 break
 
             try:
+                # Tous les modèles doivent pouvoir utiliser leurs tools
+                tool_executor = get_tool_executor()
+                ac_tools = tool_executor.get_tool_definitions() if tool_executor.available else None
+
                 response = await provider.chat_completion(
                     messages=retry_messages,
+                    tools=ac_tools,
                     temperature=0.8,
                     model_override=model_cfg.api_model_id,
                 )
@@ -526,8 +739,10 @@ class DebateOrchestrator:
     def _participant_info(p: Participant) -> Dict[str, str]:
         """Sérialise un participant pour les événements NDJSON."""
         return {
+            "id": p.id,
             "model": p.model_id,
             "provider": p.provider,
+            "display_name": p.display_name,
             "persona": p.persona_name,
             "icon": p.persona_icon,
         }

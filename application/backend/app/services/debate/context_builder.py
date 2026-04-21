@@ -80,6 +80,7 @@ class ContextBuilder:
         # Charger et formater le template opening
         system_template = self._prompts.get("opening", {}).get("system", "")
         system_prompt = system_template.format(
+            participant_id=participant.id,
             persona_name=participant.persona_name,
             persona_description=participant.persona_description,
             n_participants=n_participants,
@@ -142,6 +143,7 @@ class ContextBuilder:
         # Formater le system prompt
         system_template = self._prompts.get("debate", {}).get("system", "")
         system_prompt = system_template.format(
+            participant_id=participant.id,
             persona_name=participant.persona_name,
             persona_description=participant.persona_description,
             question=question,
@@ -294,11 +296,12 @@ class ContextBuilder:
         for turn in opening_turns:
             pos = turn.structured_position
             if pos:
+                args_str = ', '.join(str(a) for a in pos.arguments[:4])
                 lines.append(
                     f"**{turn.participant_id}** :\n"
                     f"- Thèse : {pos.thesis}\n"
                     f"- Confidence : {pos.confidence}/100\n"
-                    f"- Arguments : {', '.join(pos.arguments[:4])}"
+                    f"- Arguments : {args_str}"
                 )
             elif turn.content:
                 # Pas de position structurée → texte brut (tronqué)
@@ -334,10 +337,11 @@ class ContextBuilder:
 
             # Position structurée
             if pos:
+                args_str = ', '.join(str(a) for a in pos.arguments[:4])
                 parts.append(
                     f"\n> Thèse : {pos.thesis}\n"
                     f"> Confidence : {pos.confidence}/100\n"
-                    f"> Arguments : {', '.join(pos.arguments[:4])}"
+                    f"> Arguments : {args_str}"
                 )
                 if pos.challenged:
                     parts.append(
@@ -345,10 +349,10 @@ class ContextBuilder:
                         f"{pos.challenge_reason or 'non détaillé'}"
                     )
 
-            # Tool calls (résumé)
+            # Tool calls (résumé — format Turn: [{"name": ..., "arguments": ...}])
             if turn.tool_calls:
                 tc_summary = ", ".join(
-                    tc.get("function", {}).get("name", "?")
+                    tc.get("name", tc.get("function", {}).get("name", "?"))
                     for tc in turn.tool_calls
                 )
                 parts.append(f"> Outils utilisés : {tc_summary}")

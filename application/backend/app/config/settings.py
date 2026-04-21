@@ -17,9 +17,12 @@ class Settings(BaseSettings):
     version: str = "0.1.0"
     log_level: str = "INFO"
 
-    # --- Backend ---
+    # --- Backend / MCP Server ---
     backend_host: str = "0.0.0.0"
     backend_port: int = 8000
+
+    # --- Auth (pattern Cloud Temple) ---
+    admin_bootstrap_key: str = "changeme-in-production"
 
     # --- LLMaaS (Cloud Temple SecNumCloud) ---
     llmaas_api_url: str = "https://api.ai.cloud-temple.com"

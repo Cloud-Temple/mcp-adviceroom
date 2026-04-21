@@ -99,22 +99,21 @@ arguments:
         assert position.challenge_quality == ChallengeQuality.ABSENT
 
     def test_no_position_block(self):
-        """Pas de bloc ---POSITION--- → fallback avec thesis 'Non structuré'."""
+        """Pas de bloc ---POSITION--- → position None (pas de données structurées)."""
         text = "Juste du texte libre sans structure."
         prose, position = parse_position(text)
         assert prose == text.strip()
-        assert position.thesis == "Non structuré"
-        assert position.confidence == 50
+        assert position is None
 
     def test_invalid_yaml(self):
-        """YAML invalide dans le bloc → fallback."""
+        """YAML invalide dans le bloc → position None."""
         text = """
 ---POSITION---
 [ceci n'est pas du yaml valide: {{
 ---END---
 """
         prose, position = parse_position(text)
-        assert position.thesis == "Parsing échoué"
+        assert position is None
 
     def test_position_with_agrees_disagrees(self):
         """Position avec accords et désaccords."""

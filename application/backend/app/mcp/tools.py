@@ -1,11 +1,10 @@
 """
 MCP Tools — Outils MCP exposés aux agents IA.
 
-Les outils sont montés sous /mcp via FastMCP (Streamable HTTP).
-Ils appellent directement les services internes (DebateOrchestrator,
-LLMRouter) — pas d'API REST intermédiaire.
+Les outils sont enregistrés via register_tools(mcp) appelé depuis main.py.
+Ils appellent directement les services internes (DebateOrchestrator, LLMRouter).
 
-Outils exposés :
+Outils :
 - debate_create     (write)  → Créer et lancer un débat
 - debate_status     (read)   → Statut d'un débat
 - debate_list       (read)   → Lister les débats
@@ -21,185 +20,138 @@ from pathlib import Path
 from typing import Annotated, Any, Dict, List, Optional
 
 from pydantic import Field
-from mcp.server.fastmcp import FastMCP
-
-from ..config.settings import get_settings
-from ..services.llm.router import get_llm_router
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["mcp", "setup_mcp"]
+__all__ = ["register_tools"]
 
 
 # ============================================================
-# Instance FastMCP
-# ============================================================
-
-settings = get_settings()
-
-mcp = FastMCP(
-    name="AdviceRoom",
-    instructions=(
-        "AdviceRoom orchestre des débats structurés entre LLMs hétérogènes. "
-        "Utilisez debate_create pour lancer un débat, debate_status pour suivre "
-        "son avancement, et provider_list pour voir les LLMs disponibles."
-    ),
-)
-
-
-# ============================================================
-# Référence au store des débats (partagé avec le router REST)
+# Helpers (accès aux services partagés)
 # ============================================================
 
 def _get_debate_store():
-    """Accède au store en mémoire des débats (partagé avec routers/debates.py)."""
+    """Accède au store en mémoire des débats."""
     from ..routers.debates import _active_debates
     return _active_debates
 
 
 def _get_orchestrator():
-    """Accède à l'orchestrateur (partagé avec routers/debates.py)."""
+    """Accède à l'orchestrateur."""
     from ..routers.debates import get_orchestrator
     return get_orchestrator()
 
 
 # ============================================================
-# Outils MCP — Débats
+# Enregistrement des outils MCP
 # ============================================================
 
-@mcp.tool()
-async def debate_create(
-    question: Annotated[str, Field(description="La question à débattre")],
-    participants: Annotated[
-        List[Dict[str, str]],
-        Field(description="Liste de participants [{\"provider\": \"...\", \"model\": \"...\"}]"),
-    ],
-    persona_overrides: Annotated[
-        Optional[Dict[str, str]],
-        Field(description="Overrides de personas {model_id: persona_id}"),
-    ] = None,
-    max_rounds: Annotated[
-        Optional[int],
-        Field(description="Nombre max de rounds (défaut: 5)"),
-    ] = None,
-) -> dict:
+def register_tools(mcp):
     """
-    Crée et lance un nouveau débat entre LLMs.
+    Enregistre tous les outils MCP AdviceRoom sur l'instance FastMCP.
 
-    Le débat est exécuté en tâche de fond. Utilisez debate_status
-    pour suivre l'avancement et récupérer le verdict.
-
-    Returns:
-        ID du débat créé et informations de base.
+    Appelé depuis main.py après la création de l'instance FastMCP.
     """
-    import asyncio
-    from ..routers.debates import (
-        _active_debates,
-        _debate_events,
-        _run_debate_task,
-    )
 
-    orchestrator = _get_orchestrator()
+    # ── debate_create ────────────────────────────────────
 
-    config_overrides = {}
-    if max_rounds:
-        config_overrides["max_rounds"] = max_rounds
+    @mcp.tool()
+    async def debate_create(
+        question: Annotated[str, Field(description="La question à débattre")],
+        participants: Annotated[
+            List[Dict[str, str]],
+            Field(description='Liste [{\"provider\": \"...\", \"model\": \"...\"}]'),
+        ],
+        persona_overrides: Annotated[
+            Optional[Dict[str, str]],
+            Field(description="Overrides de personas {model_id: persona_id}"),
+        ] = None,
+        max_rounds: Annotated[
+            Optional[int],
+            Field(description="Nombre max de rounds (défaut: 5)"),
+        ] = None,
+    ) -> dict:
+        """
+        Crée et lance un nouveau débat entre LLMs.
 
-    debate = orchestrator.create_debate(
-        question=question,
-        participant_specs=participants,
-        persona_overrides=persona_overrides,
-        config_overrides=config_overrides or None,
-    )
+        Le débat est exécuté en tâche de fond. Utilisez debate_status
+        pour suivre l'avancement et récupérer le verdict.
+        """
+        import asyncio
+        from ..routers.debates import (
+            _active_debates, _debate_events, _debate_events_history,
+            _run_debate_task,
+        )
 
-    if len(debate.participants) < 2:
+        orchestrator = _get_orchestrator()
+
+        config_overrides = {}
+        if max_rounds:
+            config_overrides["max_rounds"] = max_rounds
+
+        debate = orchestrator.create_debate(
+            question=question,
+            participant_specs=participants,
+            persona_overrides=persona_overrides,
+            config_overrides=config_overrides or None,
+        )
+
+        if len(debate.participants) < 2:
+            return {"status": "error", "message": "Au moins 2 participants valides requis."}
+
+        _active_debates[debate.id] = debate
+        _debate_events[debate.id] = asyncio.Queue()
+        _debate_events_history[debate.id] = []
+        asyncio.create_task(_run_debate_task(debate.id))
+
         return {
-            "status": "error",
-            "message": "Au moins 2 participants valides requis.",
+            "status": "ok",
+            "debate_id": debate.id,
+            "question": debate.question,
+            "participants": [
+                {"model": p.model_id, "persona": p.persona_name}
+                for p in debate.participants
+            ],
+            "stream_url": f"/api/v1/debates/{debate.id}/stream",
         }
 
-    # Stocker et lancer
-    _active_debates[debate.id] = debate
-    _debate_events[debate.id] = asyncio.Queue()
-    asyncio.create_task(_run_debate_task(debate.id))
+    # ── debate_status ────────────────────────────────────
 
-    return {
-        "status": "ok",
-        "debate_id": debate.id,
-        "question": debate.question,
-        "participants": [
-            {"model": p.model_id, "persona": p.persona_name}
-            for p in debate.participants
-        ],
-    }
+    @mcp.tool()
+    async def debate_status(
+        debate_id: Annotated[str, Field(description="ID du débat")],
+    ) -> dict:
+        """
+        Retourne le statut actuel d'un débat.
 
+        Inclut statut, phase, participants, rounds, et verdict si terminé.
+        """
+        debates = _get_debate_store()
+        debate = debates.get(debate_id)
 
-@mcp.tool()
-async def debate_status(
-    debate_id: Annotated[str, Field(description="ID du débat")],
-) -> dict:
-    """
-    Retourne le statut actuel d'un débat.
+        if not debate:
+            # Chercher sur S3
+            from ..services.storage.s3_store import get_debate_store
+            store = get_debate_store()
+            if store and store.available:
+                data = store.load_debate(debate_id)
+                if data:
+                    return {"status": "ok", **data}
+            return {"status": "error", "message": f"Débat '{debate_id}' non trouvé"}
 
-    Inclut le statut, la phase, les participants, le nombre de rounds,
-    et le verdict s'il est terminé.
+        from ..services.storage.serializer import serialize_debate_full
+        return {"status": "ok", **serialize_debate_full(debate)}
 
-    Returns:
-        État complet du débat.
-    """
-    debates = _get_debate_store()
-    debate = debates.get(debate_id)
+    # ── debate_list ──────────────────────────────────────
 
-    if not debate:
-        return {"status": "error", "message": f"Débat '{debate_id}' non trouvé"}
+    @mcp.tool()
+    async def debate_list() -> dict:
+        """Liste tous les débats connus (mémoire + S3)."""
+        debates = _get_debate_store()
 
-    result = {
-        "status": "ok",
-        "debate_id": debate.id,
-        "question": debate.question,
-        "debate_status": debate.status.value,
-        "phase": debate.phase.value,
-        "participants": [
+        items = [
             {
-                "model": p.model_id,
-                "persona": p.persona_name,
-                "active": p.active,
-            }
-            for p in debate.participants
-        ],
-        "rounds": len(debate.rounds),
-    }
-
-    if debate.verdict:
-        result["verdict"] = {
-            "type": debate.verdict.type.value,
-            "confidence": debate.verdict.confidence,
-            "summary": debate.verdict.summary,
-            "agreement_points": debate.verdict.agreement_points,
-            "recommendation": debate.verdict.recommendation,
-            "key_insights": debate.verdict.key_insights,
-        }
-
-    return result
-
-
-@mcp.tool()
-async def debate_list() -> dict:
-    """
-    Liste tous les débats connus.
-
-    Retourne un résumé de chaque débat avec son statut et sa question.
-
-    Returns:
-        Liste des débats avec métadonnées de base.
-    """
-    debates = _get_debate_store()
-
-    return {
-        "status": "ok",
-        "debates": [
-            {
-                "id": d.id,
+                "debate_id": d.id,
                 "question": d.question[:100],
                 "status": d.status.value,
                 "phase": d.phase.value,
@@ -207,122 +159,103 @@ async def debate_list() -> dict:
                 "rounds": len(d.rounds),
             }
             for d in debates.values()
-        ],
-        "total": len(debates),
-    }
+        ]
 
+        # Ajouter les débats S3
+        try:
+            from ..services.storage.s3_store import get_debate_store
+            store = get_debate_store()
+            if store and store.available:
+                memory_ids = {d.id for d in debates.values()}
+                for s3d in store.list_debates(limit=20):
+                    if s3d["id"] not in memory_ids:
+                        items.append({
+                            "debate_id": s3d["id"],
+                            "source": "s3",
+                            "size": s3d["size"],
+                        })
+        except Exception:
+            pass
 
-# ============================================================
-# Outils MCP — Providers
-# ============================================================
+        return {"status": "ok", "debates": items, "total": len(items)}
 
-@mcp.tool()
-async def provider_list() -> dict:
-    """
-    Liste les LLMs disponibles, groupés par catégorie.
+    # ── provider_list ────────────────────────────────────
 
-    Catégories : snc (SecNumCloud), openai, anthropic, google.
-    Chaque modèle inclut ses capabilities (chat, tools, streaming).
+    @mcp.tool()
+    async def provider_list() -> dict:
+        """Liste les LLMs disponibles pour les débats."""
+        from ..services.llm.router import get_llm_router
+        router = get_llm_router()
+        return {"status": "ok", **router.list_providers()}
 
-    Returns:
-        Modèles groupés par catégorie avec leurs métadonnées.
-    """
-    llm_router = get_llm_router()
-    if not llm_router.loaded:
-        return {"status": "error", "message": "LLM Router non initialisé"}
+    # ── system_health ────────────────────────────────────
 
-    return {
-        "status": "ok",
-        **llm_router.get_models_by_category(),
-    }
+    @mcp.tool()
+    async def system_health() -> dict:
+        """
+        Vérifie l'état de santé du service AdviceRoom.
 
+        Teste la connectivité S3 et les providers LLM.
+        """
+        results = {}
 
-# ============================================================
-# Outils MCP — Système
-# ============================================================
+        # S3
+        try:
+            from ..services.storage.s3_store import get_debate_store
+            store = get_debate_store()
+            if store and store.available:
+                results["s3"] = store.test_connectivity()
+            else:
+                results["s3"] = {"status": "not_configured"}
+        except Exception as e:
+            results["s3"] = {"status": "error", "message": str(e)}
 
-@mcp.tool()
-async def system_health() -> dict:
-    """
-    Vérifie l'état de santé du service AdviceRoom.
+        # LLM Router
+        try:
+            from ..services.llm.router import get_llm_router
+            router = get_llm_router()
+            providers = router.list_providers()
+            results["llm_router"] = {
+                "status": "ok" if providers.get("loaded") else "not_loaded",
+                "models_count": sum(
+                    len(c.get("models", []))
+                    for c in providers.get("categories", {}).values()
+                ),
+            }
+        except Exception as e:
+            results["llm_router"] = {"status": "error", "message": str(e)}
 
-    Teste la disponibilité des composants internes
-    (LLM Router, Debate Engine).
+        all_ok = all(r.get("status") == "ok" for r in results.values())
 
-    Returns:
-        État global du système.
-    """
-    results = {}
+        return {
+            "status": "ok" if all_ok else "degraded",
+            "service": "adviceroom",
+            "services": results,
+        }
 
-    # LLM Router
-    llm_router = get_llm_router()
-    results["llm_router"] = {
-        "status": "ok" if llm_router.loaded else "error",
-        "models_active": sum(1 for m in llm_router.models.values() if m.active),
-        "providers": list(llm_router._providers.keys()),
-    }
+    # ── system_about ─────────────────────────────────────
 
-    # Débats actifs
-    debates = _get_debate_store()
-    results["debates"] = {
-        "status": "ok",
-        "active": len(debates),
-    }
+    @mcp.tool()
+    async def system_about() -> dict:
+        """Informations sur le service AdviceRoom."""
+        version = "dev"
+        vf = Path(__file__).parent.parent.parent / "VERSION"
+        if vf.exists():
+            version = vf.read_text().strip()
 
-    all_ok = all(r.get("status") == "ok" for r in results.values())
+        tools = []
+        for tool in mcp._tool_manager.list_tools():
+            raw_desc = (tool.description or "").strip()
+            first_line = raw_desc.split("\n")[0].strip()
+            tools.append({"name": tool.name, "description": first_line})
 
-    return {
-        "status": "ok" if all_ok else "degraded",
-        "service": "adviceroom",
-        "version": settings.version,
-        "services": results,
-    }
+        return {
+            "status": "ok",
+            "service": "adviceroom",
+            "version": version,
+            "python_version": platform.python_version(),
+            "tools_count": len(tools),
+            "tools": tools,
+        }
 
-
-@mcp.tool()
-async def system_about() -> dict:
-    """
-    Informations sur le service AdviceRoom.
-
-    Retourne la version, les outils MCP disponibles,
-    et les informations système.
-
-    Returns:
-        Métadonnées du service.
-    """
-    version = settings.version
-
-    tools = []
-    for tool in mcp._tool_manager.list_tools():
-        raw_desc = (tool.description or "").strip()
-        first_line = raw_desc.split("\n")[0].strip()
-        tools.append({"name": tool.name, "description": first_line})
-
-    return {
-        "status": "ok",
-        "service": "adviceroom",
-        "description": "Débats structurés entre LLMs hétérogènes",
-        "version": version,
-        "python_version": platform.python_version(),
-        "tools_count": len(tools),
-        "tools": tools,
-    }
-
-
-# ============================================================
-# Setup MCP dans FastAPI
-# ============================================================
-
-def setup_mcp(fastapi_app):
-    """
-    Monte le serveur MCP dans l'application FastAPI existante.
-
-    L'app MCP est montée sous /mcp (Streamable HTTP).
-    Les agents IA se connectent à /mcp pour utiliser les outils.
-
-    Args:
-        fastapi_app: L'instance FastAPI principale.
-    """
-    mcp_app = mcp.streamable_http_app()
-    fastapi_app.mount("/mcp", mcp_app)
-    logger.info(f"✓ MCP monté sous /mcp ({len(mcp._tool_manager.list_tools())} outils)")
+    logger.info(f"✓ {6} outils MCP enregistrés")

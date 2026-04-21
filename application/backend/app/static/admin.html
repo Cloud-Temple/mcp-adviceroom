@@ -1,0 +1,2114 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AdviceRoom — Cloud Temple</title>
+<style>
+/* ===== Design Cloud Temple — Dark Theme ===== */
+:root {
+    --bg: #0a0e1a;
+    --bg2: #0f1524;
+    --surface: #131b2e;
+    --surface2: #1a2340;
+    --surface3: #1f2b4a;
+    --accent: #41a890;
+    --accent2: #5bc4aa;
+    --accent-glow: rgba(65, 168, 144, 0.3);
+    --text: #e0e4ec;
+    --text2: #b0b8c8;
+    --muted: #6b7a94;
+    --border: #1e2a42;
+    --red: #e85d5d;
+    --green: #41a890;
+    --orange: #e8a33d;
+    --blue: #5b8def;
+    --purple: #9b6bef;
+    --cyan: #5bc4e8;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+}
+
+/* ===== LOGIN ===== */
+.login-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: radial-gradient(ellipse at 50% 30%, #0f1a2e 0%, var(--bg) 70%);
+}
+
+.login-card {
+    width: 420px;
+    background: linear-gradient(135deg, rgba(19, 27, 46, 0.95), rgba(15, 21, 36, 0.98));
+    border: 1px solid var(--accent-glow);
+    border-radius: 16px;
+    padding: 48px 40px 36px;
+    text-align: center;
+    box-shadow: 0 0 40px rgba(65, 168, 144, 0.08), 0 0 80px rgba(65, 168, 144, 0.04);
+}
+
+.ct-brand { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 24px; }
+.service-name { font-size: 1.5rem; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.service-desc { font-size: 0.85rem; color: var(--muted); margin-bottom: 28px; }
+
+.login-label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.85rem; color: var(--text2); margin-bottom: 8px; text-align: left;
+}
+
+/* Token input — pas de type=password pour éviter le popup navigateur */
+.token-field { position: relative; margin-bottom: 16px; }
+.token-field input {
+    width: 100%; padding: 12px 44px 12px 16px;
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-size: 0.9rem; font-family: 'SF Mono', Monaco, monospace;
+    -webkit-text-security: disc; /* Masque visuellement sans type=password */
+}
+.token-field input.revealed { -webkit-text-security: none; }
+.token-field input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(65, 168, 144, 0.15); }
+.token-field input::placeholder { color: var(--muted); font-family: -apple-system, sans-serif; -webkit-text-security: none; }
+.token-toggle {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer; font-size: 1.1rem; color: var(--muted);
+    padding: 4px;
+}
+.token-toggle:hover { color: var(--text); }
+
+.login-btn {
+    width: 100%; padding: 12px; background: var(--accent); color: #fff;
+    border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600;
+    cursor: pointer; transition: background 0.2s;
+}
+.login-btn:hover { background: var(--accent2); }
+.login-hint { margin-top: 16px; font-size: 0.75rem; color: var(--muted); }
+.login-error { color: var(--red); font-size: 0.8rem; margin-top: 8px; min-height: 1.2em; }
+
+/* ===== APP LAYOUT ===== */
+.app { display: flex; min-height: 100vh; }
+
+/* Sidebar */
+.sidebar {
+    width: 230px; background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; flex-shrink: 0;
+}
+.sidebar-header { padding: 20px 16px; border-bottom: 1px solid var(--border); text-align: center; }
+.sidebar-header .ct-mini-logo { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 12px; }
+.sidebar-header .ct-mini-text { font-size: 0.7rem; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
+.sidebar-service { font-size: 1.05rem; font-weight: 700; color: var(--accent); }
+.sidebar-version { font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
+
+.sidebar nav { flex: 1; padding: 12px 0; }
+.sidebar nav button {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 10px 20px; background: none; border: none; color: var(--muted);
+    cursor: pointer; font-size: 0.85rem; text-align: left;
+    border-left: 3px solid transparent; transition: all 0.15s;
+}
+.sidebar nav button:hover { color: var(--text); background: rgba(65, 168, 144, 0.05); }
+.sidebar nav button.active { color: var(--accent); border-left-color: var(--accent); background: rgba(65, 168, 144, 0.1); }
+.sidebar nav button .icon { font-size: 1rem; width: 20px; text-align: center; }
+
+.sidebar-footer { padding: 14px 16px; border-top: 1px solid var(--border); font-size: 0.7rem; color: var(--muted); }
+.sidebar-footer .user { color: var(--accent); font-weight: 600; margin-bottom: 6px; }
+
+.btn-ghost { background: none; border: 1px solid var(--border); color: var(--muted); padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; }
+.btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+
+/* Main */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+.topbar {
+    padding: 14px 24px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center; background: var(--surface);
+}
+.topbar h2 { font-size: 1rem; font-weight: 600; color: var(--text); }
+.topbar .actions { display: flex; gap: 8px; }
+.content { flex: 1; overflow-y: auto; padding: 24px; }
+
+/* Cards */
+.card { background: var(--surface); padding: 20px; border-radius: 10px; margin-bottom: 16px; border: 1px solid var(--border); }
+.card h3 { color: var(--accent); margin-bottom: 12px; font-size: 0.9rem; font-weight: 600; }
+
+/* Stats grid */
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.stat { text-align: center; padding: 18px 12px; background: var(--surface2); border-radius: 10px; border: 1px solid var(--border); }
+.stat .value { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+.stat .label { font-size: 0.65rem; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+th { color: var(--accent); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+
+/* Badges */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
+.badge-ok { background: rgba(65, 168, 144, 0.15); color: var(--green); }
+.badge-err { background: rgba(232, 93, 93, 0.15); color: var(--red); }
+.badge-warn { background: rgba(232, 163, 61, 0.15); color: var(--orange); }
+.badge-info { background: rgba(91, 141, 239, 0.15); color: var(--blue); }
+.badge-purple { background: rgba(155, 107, 239, 0.15); color: var(--purple); }
+
+/* Provider badges */
+.provider-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;
+}
+.provider-llmaas { background: rgba(91, 196, 232, 0.15); color: var(--cyan); }
+.provider-openai { background: rgba(65, 168, 144, 0.15); color: var(--green); }
+.provider-anthropic { background: rgba(232, 163, 61, 0.15); color: var(--orange); }
+.provider-google { background: rgba(91, 141, 239, 0.15); color: var(--blue); }
+
+/* Verdict badges */
+.verdict-consensus { background: rgba(65, 168, 144, 0.2); color: var(--green); border: 1px solid rgba(65, 168, 144, 0.3); }
+.verdict-consensus_partiel { background: rgba(232, 163, 61, 0.2); color: var(--orange); border: 1px solid rgba(232, 163, 61, 0.3); }
+.verdict-dissensus { background: rgba(232, 93, 93, 0.2); color: var(--red); border: 1px solid rgba(232, 93, 93, 0.3); }
+
+/* Inputs & Buttons */
+input, select { background: var(--bg2); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; }
+input:focus { outline: none; border-color: var(--accent); }
+.btn { background: var(--accent); color: #fff; border: none; padding: 7px 16px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
+.btn:hover { background: var(--accent2); }
+.btn-sm { padding: 4px 10px; font-size: 0.72rem; }
+.btn-danger { background: var(--red); }
+.btn-secondary { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--surface3); color: var(--text); }
+
+/* Misc */
+.hidden { display: none !important; }
+
+/* ===== DEBATE LIST ===== */
+.debate-card {
+    padding: 16px 20px; border: 1px solid var(--border); border-radius: 10px;
+    margin-bottom: 12px; cursor: pointer; transition: all 0.15s;
+    background: var(--surface);
+}
+.debate-card:hover { border-color: var(--accent); background: var(--surface2); }
+.debate-card .question { font-size: 0.95rem; font-weight: 600; color: var(--text); margin-bottom: 8px; line-height: 1.4; }
+.debate-card .meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 6px; }
+.debate-card .meta-item { font-size: 0.75rem; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+.debate-card .participants-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.debate-card .verdict-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.debate-card .verdict-summary { font-size: 0.8rem; color: var(--text2); line-height: 1.4; }
+.confidence-bar { height: 6px; border-radius: 3px; background: var(--surface3); overflow: hidden; width: 80px; display: inline-block; vertical-align: middle; }
+.confidence-fill { height: 100%; border-radius: 3px; }
+
+/* ===== DEBATE VIEWER ===== */
+.debate-viewer { display: none; }
+.debate-viewer.active { display: block; }
+.viewer-header { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+.viewer-back { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 1.2rem; padding: 4px; margin-top: 2px; }
+.viewer-back:hover { color: var(--accent2); }
+.viewer-question { font-size: 1.1rem; font-weight: 700; color: var(--text); line-height: 1.4; flex: 1; }
+
+.viewer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+@media (max-width: 900px) { .viewer-grid { grid-template-columns: 1fr; } }
+
+.participant-card {
+    padding: 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2);
+}
+.participant-card .p-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.participant-card .p-icon { font-size: 1.3rem; }
+.participant-card .p-name { font-weight: 600; color: var(--text); font-size: 0.9rem; }
+.participant-card .p-model { font-size: 0.75rem; color: var(--muted); }
+.participant-card .p-persona { font-size: 0.78rem; color: var(--text2); font-style: italic; margin-top: 4px; }
+
+.verdict-panel {
+    padding: 20px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 16px;
+}
+.verdict-panel h4 { font-size: 0.85rem; color: var(--accent); margin-bottom: 8px; }
+.verdict-panel .v-summary { font-size: 0.88rem; color: var(--text); line-height: 1.6; margin-bottom: 14px; }
+.verdict-panel .v-section { margin-bottom: 12px; }
+.verdict-panel .v-section h5 { font-size: 0.78rem; color: var(--text2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.verdict-panel .v-list { list-style: none; padding: 0; }
+.verdict-panel .v-list li { font-size: 0.83rem; color: var(--text2); padding: 3px 0; padding-left: 16px; position: relative; }
+.verdict-panel .v-list li::before { content: '→'; position: absolute; left: 0; color: var(--accent); }
+.verdict-panel .v-recommendation { font-size: 0.85rem; color: var(--text); padding: 12px; background: var(--surface2); border-radius: 8px; border-left: 3px solid var(--accent); }
+
+/* Logs */
+.log-entry { font-family: 'SF Mono', Monaco, monospace; font-size: 0.76rem; padding: 3px 0; color: var(--muted); }
+.log-entry .ok { color: var(--green); }
+.log-entry .err { color: var(--red); }
+.log-entry .method { color: var(--accent); font-weight: 600; }
+
+/* Empty state */
+.empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+.empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.5; }
+.empty-state p { font-size: 0.9rem; }
+
+/* ===== TOOLTIPS ===== */
+.tip {
+    position: relative; cursor: help;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 15px; height: 15px; border-radius: 50%;
+    background: rgba(65, 168, 144, 0.15); color: var(--accent);
+    font-size: 0.6rem; font-weight: 700; margin-left: 4px;
+    vertical-align: middle; line-height: 1;
+}
+.tip::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+    background: var(--surface3); color: var(--text); border: 1px solid var(--border);
+    padding: 6px 10px; border-radius: 6px; font-size: 0.73rem; font-weight: 400;
+    white-space: normal; width: 240px; text-align: left; line-height: 1.4;
+    pointer-events: none; opacity: 0; transition: opacity 0.15s;
+    z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.tip:hover::after { opacity: 1; }
+
+/* ===== TIMELINE ===== */
+.timeline { position: relative; padding-left: 24px; }
+.timeline::before {
+    content: ''; position: absolute; left: 8px; top: 0; bottom: 0;
+    width: 2px; background: var(--border);
+}
+.tl-item {
+    position: relative; margin-bottom: 16px; padding: 14px 16px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    transition: all 0.15s;
+}
+.tl-item:hover { border-color: rgba(65, 168, 144, 0.3); }
+.tl-item.tl-verdict { border-color: var(--accent); background: rgba(65, 168, 144, 0.05); }
+.tl-item::before {
+    content: ''; position: absolute; left: -20px; top: 18px;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg);
+}
+.tl-item.tl-phase::before { background: var(--blue); }
+.tl-item.tl-verdict::before { background: var(--green); width: 12px; height: 12px; left: -21px; }
+.tl-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.tl-phase-label {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--blue); font-weight: 700; padding: 2px 8px;
+    background: rgba(91, 141, 239, 0.1); border-radius: 4px;
+}
+.tl-content {
+    font-size: 0.85rem; color: var(--text2); line-height: 1.6;
+    max-height: 120px; overflow: hidden; position: relative;
+    transition: max-height 0.3s;
+}
+.tl-content.expanded { max-height: none; }
+.tl-content .fade-out {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 40px;
+    background: linear-gradient(transparent, var(--surface));
+    pointer-events: none;
+}
+.tl-expand {
+    background: none; border: none; color: var(--accent); cursor: pointer;
+    font-size: 0.78rem; padding: 4px 0; margin-top: 4px;
+}
+.tl-expand:hover { color: var(--accent2); }
+.tl-position {
+    margin-top: 8px; padding: 8px 12px; background: var(--surface2);
+    border-radius: 6px; border-left: 3px solid var(--accent); font-size: 0.82rem;
+}
+.tl-position .pos-thesis { color: var(--text); font-weight: 500; margin-bottom: 4px; }
+.tl-position .pos-meta { font-size: 0.75rem; color: var(--muted); }
+.tl-tools { margin-top: 6px; font-size: 0.78rem; color: var(--muted); }
+.tl-stats { font-size: 0.72rem; color: var(--muted); margin-top: 6px; }
+.tl-challenge {
+    margin-top: 6px; font-size: 0.8rem; color: var(--orange);
+    padding: 4px 8px; background: rgba(232, 163, 61, 0.1); border-radius: 4px;
+}
+
+/* Participant filter */
+.participant-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.pf-btn {
+    padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text2); cursor: pointer;
+    font-size: 0.78rem; transition: all 0.15s; display: flex; align-items: center; gap: 4px;
+}
+.pf-btn:hover { border-color: var(--accent); color: var(--text); }
+.pf-btn.active { background: rgba(65, 168, 144, 0.15); border-color: var(--accent); color: var(--accent); }
+.tl-item.tl-hidden { display: none; }
+
+/* ===== MODEL SELECTION CARDS ===== */
+.model-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+    margin-top: 8px;
+}
+.model-card {
+    position: relative;
+    padding: 14px 16px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+}
+.model-card:hover {
+    border-color: rgba(65, 168, 144, 0.4);
+    background: var(--surface2);
+}
+.model-card.selected {
+    border-color: var(--accent);
+    background: rgba(65, 168, 144, 0.08);
+    box-shadow: 0 0 0 1px var(--accent), 0 0 16px rgba(65, 168, 144, 0.08);
+}
+.model-card .mc-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.model-card .mc-check {
+    width: 20px; height: 20px;
+    border-radius: 5px;
+    border: 2px solid var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+.model-card.selected .mc-check {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+.model-card.selected .mc-check::after {
+    content: '✓';
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+.model-card .mc-name {
+    font-weight: 600;
+    font-size: 0.88rem;
+    color: var(--text);
+    flex: 1;
+}
+.model-card .mc-provider {
+    font-size: 0.68rem;
+}
+.model-card .mc-persona {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+}
+.model-card .mc-persona-label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.model-card .mc-persona select {
+    width: 100%;
+    padding: 7px 10px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    border-radius: 6px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+.model-card .mc-persona select:focus {
+    border-color: var(--accent);
+    outline: none;
+}
+.model-card.selected .mc-persona select {
+    color: var(--accent);
+    border-color: rgba(65, 168, 144, 0.3);
+}
+.mc-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-top: 8px;
+    transition: all 0.2s;
+}
+.mc-count.ok { background: rgba(65, 168, 144, 0.1); color: var(--accent); }
+.mc-count.warn { background: rgba(232, 93, 93, 0.1); color: var(--red); }
+
+/* ===== DASHBOARD TEMPS RÉEL — Monitoring Débat ===== */
+.dash-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px; flex-wrap: wrap; gap: 8px;
+}
+.dash-header h3 { margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 8px; }
+.dash-header .live-dot {
+    width: 10px; height: 10px; border-radius: 50%; background: var(--red);
+    animation: pulse-dot 1.5s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(232,93,93,0.6); }
+    50% { opacity: 0.7; box-shadow: 0 0 0 6px rgba(232,93,93,0); }
+}
+.dash-controls { display: flex; align-items: center; gap: 12px; }
+.dash-stats {
+    display: flex; gap: 16px; font-size: 0.82rem; color: var(--text2);
+    background: var(--surface); padding: 6px 14px; border-radius: 8px;
+}
+.dash-stats .stat-val { font-weight: 700; color: var(--accent2); }
+.dash-question {
+    font-size: 1rem; font-weight: 600; color: var(--text); padding: 12px 16px;
+    background: var(--surface); border-radius: 10px; border-left: 3px solid var(--accent);
+    margin-bottom: 16px;
+}
+/* KPI Row */
+.dash-kpis {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;
+}
+.kpi-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; text-align: center; transition: border-color 0.3s;
+}
+.kpi-card:hover { border-color: rgba(65, 168, 144, 0.3); }
+.kpi-icon { font-size: 1.3rem; margin-bottom: 4px; }
+.kpi-value {
+    font-size: 1.5rem; font-weight: 800; color: var(--text);
+    font-variant-numeric: tabular-nums; line-height: 1.2;
+}
+.kpi-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+.kpi-bar {
+    height: 4px; background: var(--surface3); border-radius: 2px; margin-top: 8px; overflow: hidden;
+}
+.kpi-bar-fill {
+    height: 100%; border-radius: 2px; transition: width 0.6s ease, background 0.3s;
+}
+/* Participant Cards */
+.dash-pcards {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px; margin-bottom: 16px;
+}
+.p-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; transition: all 0.3s;
+}
+.p-card.active { border-color: rgba(65, 168, 144, 0.4); }
+.p-card.has-error { border-color: rgba(232, 93, 93, 0.4); }
+.p-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.p-card-icon { font-size: 1.4rem; }
+.p-card-name { font-weight: 700; font-size: 0.92rem; color: var(--text); }
+.p-card-meta { font-size: 0.72rem; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.p-card-conf {
+    margin: 8px 0; display: flex; align-items: center; gap: 8px;
+}
+.p-card-conf-bar {
+    flex: 1; height: 8px; background: var(--surface3); border-radius: 4px; overflow: hidden;
+}
+.p-card-conf-fill {
+    height: 100%; border-radius: 4px; transition: width 0.5s ease, background 0.3s;
+    min-width: 2px;
+}
+.p-card-conf-val { font-size: 0.88rem; font-weight: 700; min-width: 40px; text-align: right; }
+.p-card-stats {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 12px;
+    font-size: 0.76rem; color: var(--text2);
+}
+.p-card-stats .ps-label { color: var(--muted); }
+.p-card-stats .ps-value { text-align: right; font-variant-numeric: tabular-nums; }
+.p-card-thesis {
+    margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
+    font-size: 0.78rem; color: var(--text2); font-style: italic;
+    max-height: 40px; overflow: hidden; line-height: 1.4;
+}
+/* Charts Row */
+.dash-charts {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;
+}
+@media(max-width:900px){ .dash-charts { grid-template-columns: 1fr; } .dash-kpis { grid-template-columns: repeat(2, 1fr); } }
+.chart-panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px;
+}
+.chart-title { font-size: 0.82rem; font-weight: 700; color: var(--text2); margin-bottom: 12px; }
+/* Confidence chart bars */
+.conf-round { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.conf-round-label { font-size: 0.72rem; color: var(--muted); min-width: 28px; font-weight: 600; }
+.conf-bars { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.conf-bar-row { display: flex; align-items: center; gap: 6px; }
+.conf-bar-name { font-size: 0.68rem; color: var(--muted); min-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conf-bar-track { flex: 1; height: 6px; background: var(--surface3); border-radius: 3px; overflow: hidden; }
+.conf-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+.conf-bar-val { font-size: 0.68rem; min-width: 30px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Stability chart */
+.stab-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.stab-label { font-size: 0.72rem; color: var(--muted); min-width: 28px; font-weight: 600; }
+.stab-track { flex: 1; height: 10px; background: var(--surface3); border-radius: 5px; overflow: hidden; position: relative; }
+.stab-fill { height: 100%; border-radius: 5px; transition: width 0.6s ease; }
+.stab-threshold {
+    position: absolute; top: 0; height: 100%; width: 2px; background: var(--orange);
+    opacity: 0.6;
+}
+.stab-val { font-size: 0.72rem; min-width: 40px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stab-badge { font-size: 0.65rem; padding: 1px 6px; border-radius: 4px; font-weight: 600; }
+.stab-badge.stable { background: rgba(65,168,144,0.15); color: var(--green); }
+.stab-badge.unstable { background: rgba(232,93,93,0.08); color: var(--muted); }
+/* Timeline toggle */
+.dash-tl-toggle {
+    display: flex; align-items: center; gap: 8px; padding: 8px 0;
+    cursor: pointer; font-size: 0.82rem; color: var(--text2); user-select: none;
+}
+.dash-tl-toggle:hover { color: var(--accent); }
+.dash-tl-toggle .tl-arrow { transition: transform 0.2s; }
+.dash-tl-toggle .tl-arrow.collapsed { transform: rotate(-90deg); }
+.dash-tl-count { font-size: 0.72rem; color: var(--muted); }
+#dm-timeline.collapsed { display: none; }
+</style>
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<div id="login-page" class="login-page">
+<div class="login-card">
+<div class="ct-brand">
+<svg viewBox="0 0 260 39.619" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:260px;height:auto"><defs><clipPath id="lcp"><rect width="260" height="39.619" fill="none"/></clipPath></defs><g clip-path="url(#lcp)"><rect width="0.795" height="6.144" transform="translate(134.641 26.867)" fill="#FFFFFF"/><path d="M121.964,44.248c-2.81,0-4.93-.474-6.3-1.409a4.9,4.9,0,0,1-2.014-4.393,4.872,4.872,0,0,1,2.023-4.375c1.375-.936,3.492-1.41,6.29-1.41s4.9.474,6.282,1.41a4.867,4.867,0,0,1,2.031,4.375,4.892,4.892,0,0,1-2.023,4.393c-1.375.936-3.492,1.41-6.291,1.41m0-9.076a20.063,20.063,0,0,0-2.349.117,4.516,4.516,0,0,0-1.635.47,2.2,2.2,0,0,0-.969,1.04,4.872,4.872,0,0,0,0,3.294,2.24,2.24,0,0,0,.966,1.047,4.364,4.364,0,0,0,1.638.48,23.7,23.7,0,0,0,4.7,0,4.378,4.378,0,0,0,1.638-.48,2.242,2.242,0,0,0,.966-1.047,4.08,4.08,0,0,0,.287-1.647,4.026,4.026,0,0,0-.287-1.647,2.2,2.2,0,0,0-.969-1.04,4.522,4.522,0,0,0-1.635-.47,20.07,20.07,0,0,0-2.349-.117" transform="translate(-77.51 -22.275)" fill="#FFFFFF"/><path d="M62.65,44.468v-11.2h3.092v8.725H75.974v2.476Z" transform="translate(-42.727 -22.687)" fill="#FFFFFF"/><path d="M574.61,44.468v-11.2H577.7v8.725h10.233v2.476Z" transform="translate(-391.883 -22.687)" fill="#FFFFFF"/><path d="M237.512,44.465v-11.2h9.933c3.457,0,6.269,2.512,6.269,5.6s-2.813,5.6-6.269,5.6Zm3.074-2.473h6.623a3.121,3.121,0,1,0,0-6.212h-6.623Z" transform="translate(-161.983 -22.688)" fill="#FFFFFF"/><path d="M6.269,44.526C2.812,44.526,0,42.015,0,38.928s2.812-5.6,6.269-5.6H16.2v2.512H6.5a3.122,3.122,0,1,0,0,6.214h9.7v2.473Z" transform="translate(0 -22.729)" fill="#FFFFFF"/><path d="M325.227,44.522V35.828h-5.842V33.322h15.8v2.506h-6.875v8.694Z" transform="translate(-217.82 -22.726)" fill="#FFFFFF"/><path d="M380.778,44.524v-11.2h15.8v2.512H383.887V37.8h9.942v2.072h-9.942v2.142H396.58v2.511Z" transform="translate(-259.69 -22.725)" fill="#FFFFFF"/><path d="M628.21,44.524v-11.2h15.8v2.512H631.319V37.8h9.943v2.072h-9.943v2.142h12.693v2.511Z" transform="translate(-428.438 -22.725)" fill="#FFFFFF"/><path d="M516.461,44.54V33.333h9.356c3.534,0,5.644,1.533,5.644,4.1s-2.11,4.1-5.644,4.1h-6.28v3Zm3.075-5.463h6.725c1.288,0,2.089-.619,2.089-1.615s-.8-1.615-2.089-1.615h-6.725Z" transform="translate(-352.226 -22.733)" fill="#FFFFFF"/><path d="M451.01,44.319a2.093,2.093,0,0,1-1.884-1.165l-3.562-6.832-2.021,7.8H440.55l2.923-9.936a1.865,1.865,0,0,1,1.826-1.465,1.733,1.733,0,0,1,1.527.789l4.184,7.477,4.184-7.477a1.732,1.732,0,0,1,1.527-.789,1.859,1.859,0,0,1,1.821,1.449l2.928,9.952h-2.992l-2.021-7.8L452.9,43.147a2.1,2.1,0,0,1-1.888,1.172" transform="translate(-300.454 -22.318)" fill="#FFFFFF"/><path d="M184.331,44.684c-5.216-.032-7.751-1.686-7.751-5.055V33.266H179.7v6.363a2.965,2.965,0,0,0,.208,1.161,1.872,1.872,0,0,0,.7.841,3.194,3.194,0,0,0,1.23.447,26.138,26.138,0,0,0,5.138,0,3.187,3.187,0,0,0,1.231-.447,1.873,1.873,0,0,0,.705-.842,2.957,2.957,0,0,0,.207-1.16V33.266h3.116v6.363c0,3.369-2.535,5.023-7.751,5.055l-.114,0Z" transform="translate(-120.427 -22.687)" fill="#FFFFFF"/></g></svg>
+</div>
+<div class="service-name">AdviceRoom</div>
+<div class="service-desc">Débats Multi-LLM structurés</div>
+
+<div class="login-label">🔑 Token d'accès</div>
+<div class="token-field">
+    <input type="text" id="login-token" placeholder="Collez votre token ici…" autocomplete="off" data-lpignore="true" data-1p-ignore onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="token-toggle" onclick="toggleTokenVis()" title="Afficher/masquer">👁</button>
+</div>
+<button class="login-btn" onclick="doLogin()">Se connecter</button>
+<div class="login-hint">Contactez votre administrateur pour obtenir un token d'accès.</div>
+<div id="login-error" class="login-error"></div>
+</div>
+</div>
+
+<!-- ===== APP ===== -->
+<div id="app" class="app hidden">
+<aside class="sidebar">
+<div class="sidebar-header">
+    <div class="ct-mini-logo">
+        <img src="/admin/static/logo-cloudtemple.svg" alt="Cloud Temple" style="width:190px;height:auto;opacity:0.85">
+    </div>
+    <div class="sidebar-service">AdviceRoom</div>
+    <div class="sidebar-version" id="sidebar-version">v—</div>
+</div>
+<nav>
+    <button class="active" onclick="showTab('dashboard',this)"><span class="icon">📊</span> Dashboard</button>
+    <button onclick="showTab('debates',this)"><span class="icon">🏛️</span> Débats</button>
+    <button onclick="showTab('tokens',this)"><span class="icon">🔑</span> Tokens</button>
+    <button onclick="showTab('activity',this)"><span class="icon">📡</span> Activité</button>
+</nav>
+<div class="sidebar-footer">
+    <div class="user" id="user-info">—</div>
+    <button class="btn-ghost" onclick="doLogout()">Déconnexion</button>
+</div>
+</aside>
+
+<div class="main">
+
+<!-- ==================== DASHBOARD ==================== -->
+<div id="tab-dashboard">
+<div class="topbar"><h2>📊 Dashboard</h2></div>
+<div class="content">
+    <div class="grid" id="stats-grid"></div>
+    <div id="dashboard-last-debate"></div>
+    <div class="card"><h3>🔧 Services</h3><div id="services-info" style="color:var(--muted)">Chargement…</div></div>
+</div>
+</div>
+
+<!-- ==================== DEBATES ==================== -->
+<div id="tab-debates" class="hidden">
+<div class="topbar"><h2>🏛️ Débats</h2><div class="actions"><button class="btn btn-sm" onclick="showNewDebate()">➕ Nouveau débat</button> <button class="btn btn-sm btn-secondary" onclick="loadDebates()">↻ Rafraîchir</button></div></div>
+<div class="content">
+    <!-- Formulaire création -->
+    <div id="debate-create" class="card hidden">
+        <h3>🆕 Nouveau débat</h3>
+        <div style="margin-bottom:12px">
+            <label style="font-size:0.78rem;color:var(--muted)">Question</label>
+            <textarea id="dc-question" rows="3" style="width:100%;margin-top:4px;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:8px;font-size:0.9rem;resize:vertical" placeholder="Posez votre question complexe ici…"></textarea>
+        </div>
+        <div style="margin-bottom:16px">
+            <label style="font-size:0.78rem;color:var(--muted)">Modèles LLM <span class="tip" data-tip="Sélectionnez 2 à 5 modèles. Chaque LLM reçoit un rôle (persona) pour diversifier les perspectives. Cliquez sur une carte ou choisissez une persona pour activer un modèle.">?</span></label>
+            <div id="dc-models" class="model-grid" style="color:var(--muted)">Chargement des modèles…</div>
+            <div id="dc-model-count"></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;padding-top:4px;border-top:1px solid var(--border)">
+            <div><label style="font-size:0.78rem;color:var(--muted)">Rounds max <span class="tip" data-tip="Un round = un tour de table complet. Le débat dure plusieurs rounds.">?</span></label><select id="dc-rounds" style="margin-top:4px"><option value="3">3</option><option value="5" selected>5</option><option value="7">7</option><option value="10">10</option></select></div>
+            <button class="btn" onclick="startDebate()" id="dc-start-btn" style="padding:9px 24px;font-size:0.88rem">🚀 Lancer le débat</button>
+            <button class="btn btn-secondary" onclick="hideNewDebate()">Annuler</button>
+        </div>
+        <div id="dc-error" style="color:var(--red);font-size:0.82rem;min-height:1.2em"></div>
+    </div>
+    <!-- Monitoring live — Dashboard temps réel -->
+    <div id="debate-monitor" class="hidden">
+        <!-- Header -->
+        <div class="dash-header">
+            <h3><span class="live-dot"></span> Débat en cours</h3>
+            <div class="dash-controls">
+                <button class="btn btn-sm btn-danger" onclick="stopDebate()" id="dm-stop-btn">🛑 Arrêter</button>
+                <div class="dash-stats" id="dm-stats">
+                    <span>⏱ <span class="stat-val" id="kpi-timer">0:00</span></span>
+                    <span>🔢 <span class="stat-val" id="kpi-tokens-live">0</span> tokens</span>
+                </div>
+            </div>
+        </div>
+        <!-- Question -->
+        <div class="dash-question" id="dm-question"></div>
+        <!-- Phase -->
+        <div id="dm-phase" style="margin-bottom:12px"></div>
+        <!-- KPI Row -->
+        <div class="dash-kpis">
+            <div class="kpi-card">
+                <div class="kpi-icon">💬</div>
+                <div class="kpi-value" id="kpi-round">0/5</div>
+                <div class="kpi-label">Round</div>
+                <div class="kpi-bar"><div class="kpi-bar-fill" id="kpi-round-bar" style="width:0%;background:var(--accent)"></div></div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon">🔢</div>
+                <div class="kpi-value" id="kpi-tokens">0</div>
+                <div class="kpi-label">Tokens Total</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon">📊</div>
+                <div class="kpi-value" id="kpi-stability">—</div>
+                <div class="kpi-label">Stabilité</div>
+                <div class="kpi-bar"><div class="kpi-bar-fill" id="kpi-stab-bar" style="width:0%;background:var(--muted)"></div></div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon">👥</div>
+                <div class="kpi-value" id="kpi-active">0/0</div>
+                <div class="kpi-label">Actifs</div>
+            </div>
+        </div>
+        <!-- Participant Cards -->
+        <div class="dash-pcards" id="dm-pcards"></div>
+        <!-- Charts Row -->
+        <div class="dash-charts">
+            <div class="chart-panel">
+                <div class="chart-title">📊 Évolution Confiance</div>
+                <div id="chart-confidence"><div style="color:var(--muted);font-size:0.78rem">En attente des données…</div></div>
+            </div>
+            <div class="chart-panel">
+                <div class="chart-title">📈 Stabilité par Round</div>
+                <div id="chart-stability"><div style="color:var(--muted);font-size:0.78rem">En attente des données…</div></div>
+            </div>
+        </div>
+        <!-- Timeline (collapsible) -->
+        <div class="dash-tl-toggle" onclick="toggleDashTimeline()">
+            <span class="tl-arrow" id="dm-tl-arrow">▾</span>
+            <span>💬 Timeline complète</span>
+            <span class="dash-tl-count" id="dm-tl-count">0 événements</span>
+        </div>
+        <div class="timeline" id="dm-timeline" style="max-height:400px;overflow-y:auto"></div>
+        <!-- Hidden data for participants badge row (backward compat) -->
+        <div id="dm-participants" style="display:none"></div>
+    </div>
+    <!-- Liste des débats -->
+    <div id="debates-list-view">
+        <div id="debates-list" style="color:var(--muted)">Chargement…</div>
+    </div>
+    <!-- Viewer inline (caché par défaut) -->
+    <div id="debate-viewer" class="debate-viewer"></div>
+</div>
+</div>
+
+<!-- ==================== TOKENS ==================== -->
+<div id="tab-tokens" class="hidden">
+<div class="topbar"><h2>🔑 Tokens d'accès</h2><div class="actions"><button class="btn btn-sm" onclick="showCreateToken()">+ Créer</button></div></div>
+<div class="content">
+    <div id="create-token-form" class="card hidden">
+        <h3>Nouveau token</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <div style="flex:1;min-width:150px"><label style="font-size:0.72rem;color:var(--muted)">Nom du client</label><input id="new-name" placeholder="ex: agent-cline" style="width:100%;margin-top:4px"></div>
+            <div style="width:140px"><label style="font-size:0.72rem;color:var(--muted)">Permissions</label><select id="new-perm" style="width:100%;margin-top:4px"><option value="read">read</option><option value="read,write">read,write</option><option value="admin,read,write">admin</option></select></div>
+            <div style="flex:1;min-width:150px"><label style="font-size:0.72rem;color:var(--muted)">Email</label><input id="new-email" placeholder="email@example.com" style="width:100%;margin-top:4px"></div>
+            <button class="btn" onclick="createToken()">Créer</button>
+        </div>
+        <div id="token-result" style="margin-top:8px"></div>
+    </div>
+    <div class="card"><h3>Tokens existants</h3><table><thead><tr><th>Client</th><th>Permissions</th><th>Email</th><th>Hash</th><th>État</th><th></th></tr></thead><tbody id="tokens-body"></tbody></table></div>
+</div>
+</div>
+
+<!-- ==================== ACTIVITY ==================== -->
+<div id="tab-activity" class="hidden">
+<div class="topbar"><h2>📡 Activité</h2><div class="actions"><button class="btn btn-sm" onclick="loadLogs()">Rafraîchir</button></div></div>
+<div class="content">
+    <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:0">
+        <button id="act-tab-llm" class="pf-btn active" onclick="showActivityTab('llm')" style="border-bottom:2px solid var(--accent);border-radius:6px 6px 0 0;padding:8px 20px;font-size:0.85rem">🤖 Activité Modèles LLM</button>
+        <button id="act-tab-web" class="pf-btn" onclick="showActivityTab('web')" style="border-radius:6px 6px 0 0;padding:8px 20px;font-size:0.85rem">🌐 Activité Web Technique</button>
+    </div>
+    <div id="act-panel-llm" class="card">
+        <div id="llm-activity-list" style="max-height:500px;overflow-y:auto;color:var(--muted)">Chargement…</div>
+    </div>
+    <div id="act-panel-web" class="card" style="display:none">
+        <div id="logs-list" style="max-height:500px;overflow-y:auto;color:var(--muted)">Chargement…</div>
+    </div>
+</div>
+</div>
+
+</div>
+</div>
+
+<script>
+/* ===== Globals ===== */
+let TOKEN='';
+let DEBATES_CACHE=[];
+const API='/admin/api';
+function hdr(){return{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'}}
+async function api(p,o={}){const r=await fetch(API+p,{...o,headers:{...hdr(),...(o.headers||{})}});return r.json()}
+
+/* ===== Token visibility toggle ===== */
+function toggleTokenVis(){
+    const i=document.getElementById('login-token');
+    i.classList.toggle('revealed');
+}
+
+/* ===== Navigation ===== */
+function showTab(name,btn){
+    document.querySelectorAll('[id^=tab-]').forEach(t=>t.classList.add('hidden'));
+    document.getElementById('tab-'+name).classList.remove('hidden');
+    document.querySelectorAll('.sidebar nav button').forEach(b=>b.classList.remove('active'));
+    if(btn)btn.classList.add('active');
+    if(name==='dashboard')loadDashboard();
+    if(name==='debates')loadDebates();
+    if(name==='tokens')loadTokens();
+    if(name==='activity')loadLogs();
+}
+
+/* ===== Auth ===== */
+async function doLogin(){
+    const t=document.getElementById('login-token').value.trim();
+    if(!t)return;
+    TOKEN=t;
+    try{
+        const d=await api('/whoami');
+        if(d.status==='ok'){
+            document.getElementById('login-page').classList.add('hidden');
+            document.getElementById('app').classList.remove('hidden');
+            document.getElementById('user-info').textContent=d.client_name;
+            localStorage.setItem('ar_token',TOKEN);
+            loadDashboard();
+        } else {
+            document.getElementById('login-error').textContent='Token invalide';
+        }
+    } catch(e){
+        document.getElementById('login-error').textContent='Erreur de connexion';
+    }
+}
+
+function doLogout(){
+    TOKEN='';
+    localStorage.removeItem('ar_token');
+    document.getElementById('app').classList.add('hidden');
+    document.getElementById('login-page').classList.remove('hidden');
+    document.getElementById('login-token').value='';
+    document.getElementById('login-error').textContent='';
+}
+
+/* ===== Markdown renderer (lightweight, no deps) ===== */
+function md(text){
+    if(!text)return '';
+    let s=esc(text);
+    // Code blocks ```...```
+    s=s.replace(/```(\w*)\n([\s\S]*?)```/g,'<pre style="background:var(--surface2);padding:10px;border-radius:6px;overflow-x:auto;font-size:0.8rem;margin:8px 0"><code>$2</code></pre>');
+    // Inline code
+    s=s.replace(/`([^`]+)`/g,'<code style="background:var(--surface2);padding:1px 5px;border-radius:3px;font-size:0.83em">$1</code>');
+    // Headers
+    s=s.replace(/^#### (.+)$/gm,'<div style="font-weight:700;color:var(--text);margin:10px 0 4px;font-size:0.85rem">$1</div>');
+    s=s.replace(/^### (.+)$/gm,'<div style="font-weight:700;color:var(--accent);margin:12px 0 6px;font-size:0.9rem">$1</div>');
+    s=s.replace(/^## (.+)$/gm,'<div style="font-weight:700;color:var(--accent);margin:14px 0 6px;font-size:0.95rem">$1</div>');
+    // Bold + italic
+    s=s.replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>');
+    s=s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+    s=s.replace(/\*(.+?)\*/g,'<em>$1</em>');
+    // Tables: detect lines starting with |
+    s=s.replace(/((?:^\|.+\|$\n?)+)/gm, function(block){
+        const rows=block.trim().split('\n').filter(r=>r.trim());
+        if(rows.length<2)return block;
+        // Skip separator row (|---|---|)
+        const dataRows=rows.filter(r=>!/^\|[\s\-:|]+\|$/.test(r));
+        if(!dataRows.length)return block;
+        let t='<table style="margin:8px 0;font-size:0.82rem"><tbody>';
+        dataRows.forEach((row,i)=>{
+            const cells=row.split('|').filter((_,idx)=>idx>0&&idx<row.split('|').length-1);
+            const tag=i===0?'th':'td';
+            t+='<tr>'+cells.map(c=>`<${tag} style="padding:4px 8px">${c.trim()}</${tag}>`).join('')+'</tr>';
+        });
+        t+='</tbody></table>';
+        return t;
+    });
+    // Unordered lists
+    s=s.replace(/^[\-\*] (.+)$/gm,'<div style="padding-left:16px;position:relative;margin:2px 0"><span style="position:absolute;left:4px;color:var(--accent)">•</span>$1</div>');
+    // Numbered lists
+    s=s.replace(/^\d+\. (.+)$/gm,'<div style="padding-left:16px;margin:2px 0">$1</div>');
+    // Blockquotes
+    s=s.replace(/^&gt; (.+)$/gm,'<div style="border-left:3px solid var(--accent);padding-left:10px;color:var(--text2);margin:4px 0">$1</div>');
+    // Restore <br> tags that were escaped
+    s=s.replace(/&lt;br&gt;/gi,'<br>').replace(/&lt;br\/&gt;/gi,'<br>').replace(/&lt;br \/&gt;/gi,'<br>');
+    // Clean LaTeX-like symbols
+    s=s.replace(/\$\\rightarrow\$/g,'→').replace(/\$\\leftarrow\$/g,'←').replace(/\$\\times\$/g,'×').replace(/\$\\geq?\$/g,'≥').replace(/\$\\leq?\$/g,'≤');
+    // Line breaks (double newline = paragraph)
+    s=s.replace(/\n\n/g,'<div style="height:8px"></div>');
+    s=s.replace(/\n/g,'<br>');
+    return s;
+}
+
+/* ===== Helpers ===== */
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+// Escape but allow <br> tags to render as line breaks
+function escBr(s){return esc(s).replace(/&lt;br&gt;/gi,'<br>').replace(/&lt;br\/&gt;/gi,'<br>').replace(/&lt;br \/&gt;/gi,'<br>')}
+function providerClass(p){return 'provider-'+(p||'unknown').toLowerCase()}
+function verdictClass(t){return 'verdict-'+(t||'').toLowerCase().replace(/ /g,'_')}
+function verdictLabel(t){
+    const m={'consensus':'✅ Consensus','consensus_partiel':'⚠️ Consensus Partiel','dissensus':'❌ Dissensus'};
+    return m[t]||t||'?';
+}
+function fmtTokens(n){return n>=1000?Math.round(n/1000)+'K':n||0}
+function fmtDate(s){
+    if(!s)return '—';
+    try{const d=new Date(s);return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch{return s.substring(0,16)}
+}
+function confColor(c){
+    if(c>=75)return 'var(--green)';
+    if(c>=50)return 'var(--orange)';
+    return 'var(--red)';
+}
+
+/* ===== DASHBOARD ===== */
+async function loadDashboard(){
+    const [health, debatesData] = await Promise.all([api('/health'), api('/debates')]);
+    const debates = debatesData.debates || [];
+    DEBATES_CACHE = debates;
+
+    // Stats grid
+    const completed = debates.filter(d=>d.status==='completed');
+    const totalTokens = debates.reduce((s,d)=>s+(d.total_tokens||0),0);
+    const g=document.getElementById('stats-grid');
+
+    const stats=[
+        {v:debates.length, l:'Débats Total'},
+        {v:completed.length, l:'Terminés'},
+        {v:fmtTokens(totalTokens), l:'Tokens Utilisés'},
+        {v:health.llm_models_count||0, l:'Modèles LLM'},
+        {v:health.s3_status==='ok'?'✅':'❌', l:'S3 Storage'},
+        {v:health.llm_status==='ok'?'✅':'⏳', l:'LLM Router'},
+    ];
+    g.innerHTML=stats.map(s=>`<div class="stat"><div class="value">${s.v}</div><div class="label">${s.l}</div></div>`).join('');
+    document.getElementById('sidebar-version').textContent='v'+(health.version||'?');
+
+    // Dernier débat
+    const lastPanel = document.getElementById('dashboard-last-debate');
+    if(completed.length>0){
+        const last=completed[0];
+        const v=last.verdict;
+        lastPanel.innerHTML=`<div class="card">
+            <h3>🏛️ Dernier débat</h3>
+            <div style="font-size:0.95rem;font-weight:600;color:var(--text);margin-bottom:8px">${esc(last.question||'Sans titre')}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+                ${(last.participants||[]).map(p=>`<span class="provider-badge ${providerClass(p.provider)}">${p.persona_icon||'🤖'} ${esc(p.display_name)}</span>`).join('')}
+            </div>
+            ${v?`<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+                <span class="badge ${verdictClass(v.type)}" style="padding:4px 12px;font-size:0.82rem">${verdictLabel(v.type)}</span>
+                <span style="color:var(--muted);font-size:0.82rem">Confiance ${v.confidence}%</span>
+                <span style="color:var(--muted);font-size:0.82rem">${last.num_rounds||'?'} rounds</span>
+                <span style="color:var(--muted);font-size:0.82rem">${fmtTokens(last.total_tokens)} tokens</span>
+            </div>
+            <div style="font-size:0.85rem;color:var(--text2);line-height:1.5">${esc(v.summary)}</div>`:''}
+            <div style="margin-top:8px;font-size:0.75rem;color:var(--muted)">${fmtDate(last.created_at)}</div>
+        </div>`;
+    } else {
+        lastPanel.innerHTML='';
+    }
+
+    // Services
+    document.getElementById('services-info').innerHTML=`
+        <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+            <span class="badge ${health.s3_status==='ok'?'badge-ok':'badge-err'}">S3 ${health.s3_status}</span>
+            <span class="badge ${health.llm_status==='ok'?'badge-ok':'badge-warn'}">LLM Router ${health.llm_status}</span>
+            <span class="badge badge-info">${health.llm_models_count} modèles</span>
+            <span class="badge badge-info">${health.tools_count} outils MCP</span>
+            <span class="badge badge-info">Python ${health.python_version||'?'}</span>
+            <span class="badge badge-info">v${health.version||'?'}</span>
+        </div>
+        ${(health.tools||[]).length?`<div style="margin-top:10px;font-size:0.78rem;color:var(--muted)">Outils : ${(health.tools||[]).map(t=>`<code style="background:var(--surface2);padding:1px 6px;border-radius:3px;font-size:0.75rem">${t}</code>`).join(' ')}</div>`:''}
+    `;
+}
+
+/* ===== DEBATES LIST ===== */
+async function loadDebates(){
+    // Si un débat est en cours de monitoring live, restaurer le panneau monitor
+    if(DM_DEBATE_ID && DM_TIMER){
+        document.getElementById('debate-monitor').classList.remove('hidden');
+        document.getElementById('debates-list-view').style.display='none';
+        document.getElementById('debate-viewer').classList.remove('active');
+        return;
+    }
+
+    // Reset viewer
+    document.getElementById('debate-monitor').classList.add('hidden');
+    document.getElementById('debate-viewer').classList.remove('active');
+    document.getElementById('debate-viewer').innerHTML='';
+    document.getElementById('debates-list-view').style.display='';
+
+    const d=await api('/debates');
+    DEBATES_CACHE=d.debates||[];
+    const c=document.getElementById('debates-list');
+
+    if(!DEBATES_CACHE.length){
+        c.innerHTML=`<div class="empty-state"><div class="icon">🏛️</div><p>Aucun débat trouvé</p></div>`;
+        return;
+    }
+
+    c.innerHTML=DEBATES_CACHE.map(db=>{
+        const v=db.verdict;
+        const vBadge=v?`<span class="badge ${verdictClass(v.type)}">${verdictLabel(v.type)}</span>`
+            :`<span class="badge badge-info">${db.status||'?'}</span>`;
+        const confBar=v?`<span class="confidence-bar"><span class="confidence-fill" style="width:${v.confidence}%;background:${confColor(v.confidence)}"></span></span> <span style="font-size:0.75rem;color:var(--muted)">${v.confidence}%</span>`:'';
+
+        return `<div class="debate-card" onclick="viewDebate('${db.id}')">
+            <div class="question">${esc(db.question||'Sans titre')}</div>
+            <div class="meta">
+                ${vBadge}
+                ${confBar}
+                <span class="meta-item">💬 ${db.num_rounds||0} rounds</span>
+                <span class="meta-item">🔢 ${fmtTokens(db.total_tokens)} tokens</span>
+                ${db.duration_s?`<span class="meta-item">⏱ ${db.duration_s}s</span>`:''}
+                <span class="meta-item">📅 ${fmtDate(db.created_at)}</span>
+            </div>
+            <div class="participants-row">
+                ${(db.participants||[]).map(p=>`<span class="provider-badge ${providerClass(p.provider)}">${p.persona_icon||'🤖'} ${esc(p.display_name)}</span>`).join('')}
+            </div>
+            ${v&&v.summary?`<div class="verdict-row"><div class="verdict-summary">${esc(v.summary.substring(0,180))}${v.summary.length>180?'…':''}</div></div>`:''}
+            <div style="margin-top:8px;text-align:right"><button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteDebate('${db.id}')" title="Supprimer ce débat">🗑️ Supprimer</button></div>
+        </div>`;
+    }).join('');
+}
+
+/* ===== Tooltip helper ===== */
+function tip(text){return `<span class="tip" data-tip="${esc(text)}">?</span>`}
+
+const TIPS={
+    confidence:"Niveau de certitude du LLM dans sa position (0-100%). Plus c'est haut, plus le modèle est sûr de son analyse.",
+    round:"Un round = un tour de table complet où chaque participant s'exprime. Le débat dure plusieurs rounds jusqu'à stabilité.",
+    thesis:"Position principale défendue par le LLM sur la question posée. Évolue au fil des rounds.",
+    verdict:"Synthèse finale produite par un LLM synthétiseur dédié après analyse de toute la trajectoire du débat.",
+    consensus:"Tous les participants convergent vers la même position avec un haut niveau de confiance.",
+    consensus_partiel:"Accord sur les points principaux mais divergences sur certains aspects. Résultat le plus fréquent.",
+    dissensus:"Désaccord structuré — les participants maintiennent des positions différentes. C'est un résultat valide, pas un échec.",
+    stability:"Mesure de convergence du débat (0-100%). Quand les positions ne changent plus significativement, le débat se stabilise.",
+    challenge:"Obligation pour chaque LLM de contester au moins un argument d'un autre participant. Évite le conformisme.",
+    opening:"Phase initiale où chaque LLM formule sa position SANS voir les autres (anti-ancrage). Produit en parallèle.",
+    tokens:"Unités de texte traitées par le LLM. Reflète la longueur et le coût des échanges.",
+    persona:"Rôle assigné au LLM (ex: Pragmatique, Avocat du diable, Expert technique) pour diversifier les perspectives.",
+};
+
+/* ===== DEBATE VIEWER ===== */
+async function viewDebate(id){
+    document.getElementById('debates-list-view').style.display='none';
+    const viewer=document.getElementById('debate-viewer');
+    viewer.classList.add('active');
+    viewer.innerHTML='<div style="color:var(--muted);padding:20px">Chargement du débat…</div>';
+
+    const d=await api('/debates/'+id);
+    if(d.status!=='ok'||!d.debate){
+        viewer.innerHTML=`<div style="color:var(--red);padding:20px">Erreur : débat non trouvé</div>`;
+        return;
+    }
+
+    const db=d.debate;
+    const v=db.verdict;
+    const stats=db.stats||{};
+    const participants=db.participants||[];
+    // Build participant lookup
+    const pMap={};
+    for(const p of participants) pMap[p.id]=p;
+
+    let html=`
+    <div class="viewer-header">
+        <button class="viewer-back" onclick="closeViewer()" title="Retour">← Retour</button>
+        <div>
+            <div class="viewer-question">${esc(db.question)}</div>
+            <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+                <span class="badge badge-info">${db.status}</span>
+                <span style="color:var(--muted);font-size:0.78rem">${fmtDate(db.created_at)}</span>
+                <span style="color:var(--muted);font-size:0.78rem">${stats.total_rounds||0} rounds${tip(TIPS.round)}</span>
+                <span style="color:var(--muted);font-size:0.78rem">${fmtTokens(db.total_tokens||stats.total_tokens)} tokens${tip(TIPS.tokens)}</span>
+                ${stats.total_duration_ms?`<span style="color:var(--muted);font-size:0.78rem">${(stats.total_duration_ms/1000).toFixed(1)}s</span>`:''}
+            </div>
+        </div>
+    </div>`;
+
+    // Participants (clickable)
+    html+=`<h3 style="color:var(--accent);margin-bottom:12px;font-size:0.9rem">👥 Participants ${tip(TIPS.persona)}</h3>`;
+    html+=`<div class="viewer-grid" style="margin-bottom:20px">`;
+    for(const p of participants){
+        const pStats=stats.tokens_by_participant?.[p.id]||{};
+        html+=`<div class="participant-card" style="cursor:pointer" onclick="filterTimeline('${p.id}')" title="Cliquer pour voir ses interventions">
+            <div class="p-header">
+                <span class="p-icon">${p.persona_icon||'🤖'}</span>
+                <span class="p-name">${esc(p.display_name)}</span>
+                <span class="provider-badge ${providerClass(p.provider)}" style="margin-left:auto">${esc(p.provider)}</span>
+            </div>
+            <div class="p-model">${esc(p.model_id)} — ${esc(p.persona_name)}</div>
+            ${pStats.tokens?`<div style="margin-top:6px;font-size:0.75rem;color:var(--muted)">${pStats.tokens} tokens · ${pStats.turns} tours · ${(pStats.duration_ms/1000).toFixed(1)}s</div>`:''}
+        </div>`;
+    }
+    html+=`</div>`;
+
+    // Verdict
+    if(v){
+        html+=`<div class="verdict-panel" style="background:var(--surface)">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+                <span style="font-size:1.3rem">⚖️</span>
+                <span class="badge ${verdictClass(v.type)}" style="padding:5px 14px;font-size:0.88rem">${verdictLabel(v.type)}${tip(TIPS[v.type]||TIPS.verdict)}</span>
+                <span class="confidence-bar" style="width:120px"><span class="confidence-fill" style="width:${v.confidence}%;background:${confColor(v.confidence)}"></span></span>
+                <span style="font-size:0.85rem;color:var(--text2)">Confiance ${v.confidence}%${tip(TIPS.confidence)}</span>
+            </div>`;
+
+        if(v.summary){
+            html+=`<div class="v-summary">${md(v.summary)}</div>`;
+        }
+
+        const agreements=v.agreement_points||[];
+        if(agreements.length){
+            html+=`<div class="v-section"><h5>✅ Points d'accord (${agreements.length})</h5><ul class="v-list">`;
+            for(const a of agreements) html+=`<li>${esc(typeof a==='string'?a:JSON.stringify(a))}</li>`;
+            html+=`</ul></div>`;
+        }
+
+        const divergences=v.divergence_points||[];
+        if(divergences.length){
+            html+=`<div class="v-section"><h5>❌ Points de divergence (${divergences.length})</h5><ul class="v-list">`;
+            for(const dd of divergences){
+                const txt=typeof dd==='object'?(dd.topic||JSON.stringify(dd)):dd;
+                html+=`<li>${esc(txt)}</li>`;
+            }
+            html+=`</ul></div>`;
+        }
+
+        if(v.recommendation){
+            html+=`<div class="v-section"><h5>💡 Recommandation</h5><div class="v-recommendation">${md(v.recommendation)}</div></div>`;
+        }
+
+        const insights=v.key_insights||[];
+        if(insights.length){
+            html+=`<div class="v-section"><h5>🔍 Insights (${insights.length})</h5><ul class="v-list">`;
+            for(const ins of insights) html+=`<li>${md(typeof ins==='string'?ins:JSON.stringify(ins))}</li>`;
+            html+=`</ul></div>`;
+        }
+
+        html+=`</div>`;
+    }
+
+    // Export HTML button
+    html+=`<div style="margin-bottom:20px"><button class="btn btn-secondary" onclick="exportDebateHTML('${id}')">📄 Exporter en HTML</button></div>`;
+
+    // ===== TIMELINE — Discussion complète =====
+    html+=`<div class="card" style="padding-bottom:8px">
+        <h3>💬 Discussion complète ${tip(TIPS.round)}</h3>
+        <div class="participant-filter" id="pf-bar">
+            <button class="pf-btn active" onclick="filterTimeline('all')">🔄 Tous</button>`;
+    for(const p of participants){
+        html+=`<button class="pf-btn" data-pid="${p.id}" onclick="filterTimeline('${p.id}')">${p.persona_icon||'🤖'} ${esc(p.display_name)}</button>`;
+    }
+    html+=`</div><div class="timeline" id="debate-timeline">`;
+
+    // Opening phase
+    const openingTurns=db.opening_turns||[];
+    if(openingTurns.length){
+        html+=`<div class="tl-item tl-phase"><div class="tl-header"><span class="tl-phase-label">📖 Ouverture${tip(TIPS.opening)}</span></div></div>`;
+        for(const t of openingTurns){
+            html+=renderTimelineTurn(t, pMap, 'Ouverture');
+        }
+    }
+
+    // Rounds
+    const rounds=db.rounds||[];
+    for(const rnd of rounds){
+        const stab=rnd.stability_score;
+        const stabTxt=stab!=null?` — Stabilité ${Math.round(stab*100)}%`:'';
+        html+=`<div class="tl-item tl-phase"><div class="tl-header"><span class="tl-phase-label">💬 Round ${rnd.number}${stabTxt}${tip(TIPS.stability)}</span></div></div>`;
+        for(const t of (rnd.turns||[])){
+            html+=renderTimelineTurn(t, pMap, `Round ${rnd.number}`);
+        }
+    }
+
+    // Verdict turn
+    if(v){
+        html+=`<div class="tl-item tl-verdict"><div class="tl-header">
+            <span class="tl-phase-label" style="color:var(--green);background:rgba(65,168,144,0.1)">⚖️ Verdict${tip(TIPS.verdict)}</span>
+            <span class="badge ${verdictClass(v.type)}">${verdictLabel(v.type)}</span>
+            <span style="font-size:0.78rem;color:var(--muted)">Confiance ${v.confidence}%</span>
+        </div>
+        <div class="tl-content expanded" style="max-height:none"><div style="font-size:0.85rem;color:var(--text2);line-height:1.6">${esc((v.summary||'').substring(0,400))}</div></div>
+        </div>`;
+    }
+
+    html+=`</div></div>`;
+
+    // Position evolution with tooltips
+    const pe=stats.position_evolution||{};
+    if(Object.keys(pe).length){
+        html+=`<div class="card"><h3>📈 Évolution des positions${tip(TIPS.thesis)}</h3><table><thead><tr><th>Participant</th><th>Round${tip(TIPS.round)}</th><th>Confiance${tip(TIPS.confidence)}</th><th>Thèse${tip(TIPS.thesis)}</th></tr></thead><tbody>`;
+        for(const [pid,positions] of Object.entries(pe)){
+            const pInfo=pMap[pid]||{};
+            for(const pos of positions){
+                const rLabel=pos.round===0?'Ouverture':`Round ${pos.round}`;
+                html+=`<tr>
+                    <td>${pInfo.persona_icon||'🤖'} ${esc(pInfo.display_name||pid)}</td>
+                    <td>${rLabel}</td>
+                    <td><span style="color:${confColor(pos.confidence)}">${pos.confidence}%</span></td>
+                    <td style="font-size:0.8rem;color:var(--text2)">${(pos.thesis||'').match(/pars(ing|e)\s*(é|e)chou/i)?'<span style="color:var(--muted);font-style:italic">⚠️ Position non parsée</span>':escBr((pos.thesis||'').substring(0,100))}</td>
+                </tr>`;
+            }
+        }
+        html+=`</tbody></table></div>`;
+    }
+
+    // Stability history with tooltip
+    const sh=stats.stability_history||[];
+    if(sh.length){
+        html+=`<div class="card"><h3>📊 Stabilité par round${tip(TIPS.stability)}</h3><div style="display:flex;gap:12px;align-items:flex-end;height:60px;padding:8px 0">`;
+        for(const s of sh){
+            const pct=Math.round((s.score||0)*100);
+            html+=`<div style="text-align:center;flex:1">
+                <div style="background:${confColor(pct)};height:${Math.max(4,pct*0.5)}px;border-radius:3px;margin-bottom:4px"></div>
+                <div style="font-size:0.7rem;color:var(--muted)">R${s.round}</div>
+                <div style="font-size:0.72rem;color:var(--text2)">${pct}%</div>
+            </div>`;
+        }
+        html+=`</div></div>`;
+    }
+
+    viewer.innerHTML=html;
+}
+
+/* ===== Render a single timeline turn ===== */
+function renderTimelineTurn(t, pMap, phaseLabel){
+    const p=pMap[t.participant_id]||{display_name:t.participant_id,persona_icon:'🤖',provider:'?'};
+    const content=(t.content||'').trim();
+    const pos=t.position;
+    const isLong=content.length>300;
+    const uid='tl_'+Math.random().toString(36).substr(2,8);
+
+    let h=`<div class="tl-item" data-pid="${t.participant_id}">
+        <div class="tl-header">
+            <span style="font-size:1.1rem">${p.persona_icon||'🤖'}</span>
+            <span style="font-weight:600;color:var(--text)">${esc(p.display_name)}</span>
+            <span class="provider-badge ${providerClass(p.provider)}" style="font-size:0.68rem">${esc(p.provider)}</span>
+            <span style="font-size:0.72rem;color:var(--muted);margin-left:auto">${phaseLabel}</span>
+        </div>`;
+
+    if(t.error){
+        h+=`<div style="color:var(--red);font-size:0.83rem;margin-top:4px">❌ ${esc(t.error)}</div>`;
+    } else if(content){
+        h+=`<div class="tl-content${isLong?'':' expanded'}" id="${uid}">
+            <div>${md(content)}</div>
+            ${isLong?'<div class="fade-out"></div>':''}
+        </div>`;
+        if(isLong){
+            h+=`<button class="tl-expand" onclick="toggleTlContent('${uid}',this)">▼ Voir plus</button>`;
+        }
+    } else if(!pos&&!t.error){
+        // Empty turn (e.g. Gemini HTTP 400 — no content, no error, no position)
+        h+=`<div style="color:var(--muted);font-size:0.82rem;font-style:italic;margin-top:4px">⚠️ Pas de réponse (le modèle n'a pas pu produire de contenu pour ce tour)</div>`;
+    }
+
+    // Position (skip "Parsing échoué" / "Parsing echoué" / empty thesis with conf 50)
+    const isParseFail=pos&&((pos.thesis||'').match(/pars/i)||(pos.confidence===50&&!(pos.thesis||'').trim()));
+    if(pos&&!isParseFail){
+        h+=`<div class="tl-position">
+            <div class="pos-thesis">💭 ${escBr(pos.thesis||'')}</div>
+            <div class="pos-meta">
+                Confiance : <span style="color:${confColor(pos.confidence||50)}">${pos.confidence||'?'}%</span>
+                ${(pos.arguments||[]).length?` · ${pos.arguments.length} arguments`:''}
+            </div>`;
+        if(pos.challenged){
+            h+=`<div class="tl-challenge">⚔️ Challenge → ${esc(pos.challenged)}${pos.challenge_reason?' : '+esc(String(pos.challenge_reason).substring(0,120)):''}</div>`;
+        }
+        h+=`</div>`;
+    }
+
+    // Tools
+    if((t.tool_calls||[]).length){
+        h+=`<div class="tl-tools">🔧 Outils : ${t.tool_calls.map(tc=>`<code>${esc(tc.name||tc.function?.name||'?')}</code>`).join(', ')}</div>`;
+    }
+
+    // Stats
+    const tok=t.tokens_used||0;
+    const dur=t.duration_ms||0;
+    if(tok||dur){
+        h+=`<div class="tl-stats">${tok?tok+' tokens':''}${tok&&dur?' · ':''}${dur?(dur<1000?dur+'ms':(dur/1000).toFixed(1)+'s'):''}</div>`;
+    }
+
+    h+=`</div>`;
+    return h;
+}
+
+/* ===== Timeline expand/collapse ===== */
+function toggleTlContent(uid, btn){
+    const el=document.getElementById(uid);
+    if(el.classList.contains('expanded')){
+        el.classList.remove('expanded');
+        const fo=el.querySelector('.fade-out');
+        if(fo)fo.style.display='';
+        btn.textContent='▼ Voir plus';
+    } else {
+        el.classList.add('expanded');
+        const fo=el.querySelector('.fade-out');
+        if(fo)fo.style.display='none';
+        btn.textContent='▲ Réduire';
+    }
+}
+
+/* ===== Timeline filter by participant ===== */
+function filterTimeline(pid){
+    // Update button states
+    document.querySelectorAll('#pf-bar .pf-btn').forEach(b=>{
+        b.classList.remove('active');
+        if(pid==='all'&&!b.dataset.pid) b.classList.add('active');
+        if(b.dataset.pid===pid) b.classList.add('active');
+    });
+    if(pid==='all') document.querySelector('#pf-bar .pf-btn:first-child').classList.add('active');
+
+    // Show/hide timeline items
+    document.querySelectorAll('#debate-timeline .tl-item').forEach(item=>{
+        if(pid==='all'||item.classList.contains('tl-phase')||item.classList.contains('tl-verdict')){
+            item.classList.remove('tl-hidden');
+        } else if(item.dataset.pid===pid){
+            item.classList.remove('tl-hidden');
+        } else {
+            item.classList.add('tl-hidden');
+        }
+    });
+
+    // Scroll to timeline
+    document.getElementById('debate-timeline')?.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+/* ===== NEW DEBATE — Création + Monitoring NDJSON ===== */
+let DM_MODELS=[];
+let DM_START_TIME=0;
+let DM_TOKENS=0;
+let DM_TIMER=null;
+let DM_DEBATE_ID=null;
+
+/* ===== Dashboard state tracking ===== */
+let DM_PDATA={};       // {pid: {icon,name,provider,persona,tokens,turns_ok,turns_err,duration_ms,conf,thesis,tool_calls}}
+let DM_CONF_HISTORY=[]; // [{round, participants: {pid: conf}}]
+let DM_STAB_HISTORY=[]; // [{round, score, threshold, is_stable, can_stop}]
+let DM_CURRENT_ROUND=0;
+let DM_MAX_ROUNDS=5;
+let DM_EVENT_COUNT=0;
+let DM_TL_COLLAPSED=false;
+
+function resetDashState(){
+    DM_PDATA={}; DM_CONF_HISTORY=[]; DM_STAB_HISTORY=[];
+    DM_CURRENT_ROUND=0; DM_MAX_ROUNDS=5; DM_EVENT_COUNT=0;
+    DM_TL_COLLAPSED=false;
+    document.getElementById('dm-pcards').innerHTML='';
+    document.getElementById('chart-confidence').innerHTML='<div style="color:var(--muted);font-size:0.78rem">En attente…</div>';
+    document.getElementById('chart-stability').innerHTML='<div style="color:var(--muted);font-size:0.78rem">En attente…</div>';
+    document.getElementById('kpi-round').textContent='0/'+DM_MAX_ROUNDS;
+    document.getElementById('kpi-tokens').textContent='0';
+    document.getElementById('kpi-stability').textContent='—';
+    document.getElementById('kpi-active').textContent='0/0';
+    document.getElementById('kpi-round-bar').style.width='0%';
+    document.getElementById('kpi-stab-bar').style.width='0%';
+}
+
+function toggleDashTimeline(){
+    DM_TL_COLLAPSED=!DM_TL_COLLAPSED;
+    const tl=document.getElementById('dm-timeline');
+    const arrow=document.getElementById('dm-tl-arrow');
+    if(DM_TL_COLLAPSED){ tl.classList.add('collapsed'); arrow.classList.add('collapsed'); }
+    else { tl.classList.remove('collapsed'); arrow.classList.remove('collapsed'); scrollTl(tl); }
+}
+
+/* Update participant cards */
+function renderPCards(){
+    const c=document.getElementById('dm-pcards');
+    const pids=Object.keys(DM_PDATA);
+    if(!pids.length)return;
+    c.innerHTML=pids.map(pid=>{
+        const d=DM_PDATA[pid];
+        const conf=d.conf||0;
+        const hasErr=d.turns_err>0;
+        return `<div class="p-card ${d.turns_ok>0?'active':''} ${hasErr?'has-error':''}">
+            <div class="p-card-header">
+                <span class="p-card-icon">${d.icon||'🤖'}</span>
+                <span class="p-card-name">${esc(d.name||pid)}</span>
+                <span class="p-card-meta"><span class="provider-badge ${providerClass(d.provider)}" style="font-size:0.65rem">${esc(d.provider)}</span></span>
+            </div>
+            ${d.persona?`<div style="font-size:0.72rem;color:var(--muted);margin-bottom:6px">🎭 ${esc(d.persona)}</div>`:''}
+            <div class="p-card-conf">
+                <div class="p-card-conf-bar"><div class="p-card-conf-fill" style="width:${conf}%;background:${confColor(conf)}"></div></div>
+                <div class="p-card-conf-val" style="color:${confColor(conf)}">${conf?conf+'%':'—'}</div>
+            </div>
+            <div class="p-card-stats">
+                <span class="ps-label">🔢 Tokens</span><span class="ps-value">${fmtTokens(d.tokens)}</span>
+                <span class="ps-label">✅ Tours OK</span><span class="ps-value">${d.turns_ok}</span>
+                <span class="ps-label">❌ Erreurs</span><span class="ps-value">${d.turns_err}</span>
+                <span class="ps-label">⏱ Durée</span><span class="ps-value">${d.duration_ms?((d.duration_ms/1000).toFixed(1))+'s':'—'}</span>
+                ${d.tool_calls?`<span class="ps-label">🔧 Outils</span><span class="ps-value">${d.tool_calls}</span>`:''}
+            </div>
+            ${d.thesis?`<div class="p-card-thesis">💭 ${esc(d.thesis.substring(0,120))}</div>`:''}
+        </div>`;
+    }).join('');
+}
+
+/* Render confidence evolution chart */
+function renderConfChart(){
+    const el=document.getElementById('chart-confidence');
+    if(!DM_CONF_HISTORY.length){el.innerHTML='<div style="color:var(--muted);font-size:0.78rem">En attente…</div>';return}
+    const pids=Object.keys(DM_PDATA);
+    const colors={'anthropic':'var(--orange)','openai':'var(--green)','llmaas':'var(--cyan)','google':'var(--blue)'};
+    el.innerHTML=DM_CONF_HISTORY.map(h=>{
+        const rLabel=h.round===0?'O':`R${h.round}`;
+        return `<div class="conf-round">
+            <span class="conf-round-label">${rLabel}</span>
+            <div class="conf-bars">${pids.map(pid=>{
+                const d=DM_PDATA[pid];
+                const c=h.participants[pid]||0;
+                const col=colors[d.provider]||'var(--accent)';
+                return `<div class="conf-bar-row">
+                    <span class="conf-bar-name">${d.icon||'🤖'} ${esc((d.name||pid).split(' ')[0])}</span>
+                    <div class="conf-bar-track"><div class="conf-bar-fill" style="width:${c}%;background:${col}"></div></div>
+                    <span class="conf-bar-val" style="color:${confColor(c)}">${c||'—'}%</span>
+                </div>`;
+            }).join('')}</div>
+        </div>`;
+    }).join('');
+}
+
+/* Render stability chart */
+function renderStabChart(){
+    const el=document.getElementById('chart-stability');
+    if(!DM_STAB_HISTORY.length){el.innerHTML='<div style="color:var(--muted);font-size:0.78rem">En attente…</div>';return}
+    const threshold=DM_STAB_HISTORY[0]?.threshold||0.85;
+    const threshPct=Math.round(threshold*100);
+    el.innerHTML=DM_STAB_HISTORY.map(s=>{
+        const pct=Math.round(s.score*100);
+        const col=s.can_stop?'var(--green)':s.is_stable?'var(--orange)':'var(--muted)';
+        return `<div class="stab-row">
+            <span class="stab-label">R${s.round}</span>
+            <div class="stab-track">
+                <div class="stab-fill" style="width:${pct}%;background:${col}"></div>
+                <div class="stab-threshold" style="left:${threshPct}%"></div>
+            </div>
+            <span class="stab-val" style="color:${col}">${pct}%</span>
+            ${s.can_stop?'<span class="stab-badge stable">STABLE</span>':''}
+        </div>`;
+    }).join('')+`<div style="font-size:0.65rem;color:var(--muted);margin-top:4px;text-align:right">Seuil : ${threshPct}%</div>`;
+}
+
+/* Update KPIs */
+function updateKPIs(){
+    const pids=Object.keys(DM_PDATA);
+    const activeCount=pids.filter(p=>DM_PDATA[p].turns_ok>0||DM_PDATA[p].turns_err===0).length;
+    document.getElementById('kpi-round').textContent=DM_CURRENT_ROUND+'/'+DM_MAX_ROUNDS;
+    document.getElementById('kpi-round-bar').style.width=Math.round(DM_CURRENT_ROUND/DM_MAX_ROUNDS*100)+'%';
+    document.getElementById('kpi-tokens').textContent=fmtTokens(DM_TOKENS);
+    document.getElementById('kpi-active').textContent=activeCount+'/'+pids.length;
+    const lastStab=DM_STAB_HISTORY.length?DM_STAB_HISTORY[DM_STAB_HISTORY.length-1]:null;
+    if(lastStab){
+        const pct=Math.round(lastStab.score*100);
+        document.getElementById('kpi-stability').textContent=pct+'%';
+        document.getElementById('kpi-stability').style.color=confColor(pct);
+        document.getElementById('kpi-stab-bar').style.width=pct+'%';
+        document.getElementById('kpi-stab-bar').style.background=lastStab.can_stop?'var(--green)':'var(--muted)';
+    }
+    document.getElementById('dm-tl-count').textContent=DM_EVENT_COUNT+' événements';
+}
+
+const DC_PERSONAS=[
+    {id:'auto',name:'🎲 Auto'},
+    {id:'pragmatique',name:'💼 Pragmatique'},
+    {id:'analyste_risques',name:'⚠️ Analyste risques'},
+    {id:'expert_technique',name:'🔧 Expert technique'},
+    {id:'avocat_du_diable',name:'😈 Avocat du diable'},
+    {id:'visionnaire',name:'🔮 Visionnaire'},
+];
+
+async function showNewDebate(){
+    document.getElementById('debate-create').classList.remove('hidden');
+    document.getElementById('dc-error').textContent='';
+    // Load models
+    const d=await api('/models');
+    DM_MODELS=d.models||[];
+    const c=document.getElementById('dc-models');
+    if(!DM_MODELS.length){c.innerHTML='<span style="color:var(--red)">Aucun modèle LLM chargé (LLM Router inactif)</span>';return}
+
+    c.innerHTML=DM_MODELS.filter(m=>m.active).map(m=>
+        `<div class="model-card" data-model-id="${m.id}" data-provider="${m.provider}" onclick="toggleModelCard(this,event)">
+            <div class="mc-header">
+                <div class="mc-check"></div>
+                <span class="mc-name">${esc(m.display_name)}</span>
+                <span class="provider-badge mc-provider ${providerClass(m.provider)}">${esc(m.provider)}</span>
+            </div>
+            <div class="mc-persona">
+                <div class="mc-persona-label">🎭 Persona</div>
+                <select data-model="${m.id}" class="persona-select" onchange="onPersonaChange(this)" onclick="event.stopPropagation()">
+                    ${DC_PERSONAS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}
+                </select>
+            </div>
+        </div>`
+    ).join('');
+    updateModelCount();
+}
+
+function hideNewDebate(){document.getElementById('debate-create').classList.add('hidden')}
+
+/* Toggle model card selection (clic sur la carte) */
+function toggleModelCard(card, evt){
+    // Ne pas toggler si on clique sur le select
+    if(evt&&evt.target.tagName==='SELECT') return;
+    card.classList.toggle('selected');
+    updateModelCount();
+}
+
+/* Auto-cocher le modèle quand on choisit une persona ≠ Auto */
+function onPersonaChange(sel){
+    const card=sel.closest('.model-card');
+    if(sel.value!=='auto' && !card.classList.contains('selected')){
+        card.classList.add('selected');
+        updateModelCount();
+    }
+}
+
+/* Compteur de modèles sélectionnés */
+function updateModelCount(){
+    const n=document.querySelectorAll('#dc-models .model-card.selected').length;
+    const el=document.getElementById('dc-model-count');
+    if(n===0){
+        el.innerHTML='<span class="mc-count warn">Sélectionnez au moins 2 modèles</span>';
+    } else if(n===1){
+        el.innerHTML='<span class="mc-count warn">⚠️ 1 modèle — minimum 2 requis</span>';
+    } else if(n>5){
+        el.innerHTML='<span class="mc-count warn">⚠️ '+n+' modèles — maximum 5</span>';
+    } else {
+        el.innerHTML='<span class="mc-count ok">✓ '+n+' modèles sélectionnés</span>';
+    }
+}
+
+async function startDebate(){
+    const q=document.getElementById('dc-question').value.trim();
+    if(!q){document.getElementById('dc-error').textContent='❌ Veuillez entrer une question';return}
+    const selected=document.querySelectorAll('#dc-models .model-card.selected');
+    if(selected.length<2){document.getElementById('dc-error').textContent='❌ Sélectionnez au moins 2 modèles';return}
+    if(selected.length>5){document.getElementById('dc-error').textContent='❌ Maximum 5 modèles';return}
+
+    const participants=Array.from(selected).map(card=>({
+        provider:card.dataset.provider,
+        model:card.dataset.modelId
+    }));
+    const maxRounds=parseInt(document.getElementById('dc-rounds').value)||5;
+
+    // Collecter les persona_overrides (seulement pour les cartes sélectionnées, si != auto)
+    const persona_overrides={};
+    selected.forEach(card=>{
+        const sel=card.querySelector('.persona-select');
+        if(sel && sel.value && sel.value!=='auto'){
+            persona_overrides[card.dataset.modelId]=sel.value;
+        }
+    });
+
+    document.getElementById('dc-start-btn').disabled=true;
+    document.getElementById('dc-start-btn').textContent='⏳ Lancement…';
+    document.getElementById('dc-error').textContent='';
+
+    try{
+        // POST to create debate via REST API (AuthMiddleware accepts bootstrap key)
+        const resp=await fetch('/api/v1/debates',{
+            method:'POST',
+            headers:hdr(),
+            body:JSON.stringify({question:q,participants,config:{max_rounds:maxRounds},persona_overrides:Object.keys(persona_overrides).length?persona_overrides:null})
+        });
+        const data=await resp.json();
+        if(!resp.ok){throw new Error(data.detail||data.message||'Erreur création')}
+
+        // Hide create form, show monitor
+        hideNewDebate();
+        document.getElementById('debates-list-view').style.display='none';
+        document.getElementById('debate-monitor').classList.remove('hidden');
+        document.getElementById('dm-question').textContent=q;
+        document.getElementById('dm-timeline').innerHTML='';
+        document.getElementById('dm-participants').innerHTML='';
+        document.getElementById('dm-phase').innerHTML='<span class="badge badge-info">Initialisation…</span>';
+
+        DM_TOKENS=0;
+        DM_START_TIME=Date.now();
+        DM_MAX_ROUNDS=maxRounds;
+        resetDashState();
+        DM_TIMER=setInterval(updateDmStats,1000);
+
+        // Store debate ID for stop button
+        DM_DEBATE_ID=data.debate_id;
+
+        // Stream NDJSON events
+        monitorDebate(data.debate_id, data.stream_url||`/api/v1/debates/${data.debate_id}/stream`);
+    }catch(e){
+        document.getElementById('dc-error').textContent='❌ '+e.message;
+    }finally{
+        document.getElementById('dc-start-btn').disabled=false;
+        document.getElementById('dc-start-btn').textContent='🚀 Lancer le débat';
+    }
+}
+
+function updateDmStats(){
+    const elapsed=Math.round((Date.now()-DM_START_TIME)/1000);
+    const min=Math.floor(elapsed/60);
+    const sec=elapsed%60;
+    document.getElementById('dm-stats').innerHTML=`
+        <span>⏱ ${min}:${String(sec).padStart(2,'0')}</span>
+        <span>🔢 ${fmtTokens(DM_TOKENS)} tokens</span>
+    `;
+}
+
+async function monitorDebate(debateId, streamUrl){
+    const tl=document.getElementById('dm-timeline');
+    const pMap={};
+
+    try{
+        const resp=await fetch(streamUrl,{headers:{'Authorization':'Bearer '+TOKEN}});
+        const reader=resp.body.getReader();
+        const decoder=new TextDecoder();
+        let buffer='';
+
+        while(true){
+            const {done,value}=await reader.read();
+            if(done)break;
+            buffer+=decoder.decode(value,{stream:true});
+            const lines=buffer.split('\n');
+            buffer=lines.pop()||'';
+
+            for(const line of lines){
+                if(!line.trim())continue;
+                try{
+                    const evt=JSON.parse(line);
+                    handleLiveEvent(evt,tl,pMap);
+                }catch{}
+            }
+        }
+    }catch(e){
+        tl.innerHTML+=`<div class="tl-item" style="border-color:var(--red)"><div style="color:var(--red)">❌ Erreur de connexion : ${esc(e.message)}</div></div>`;
+    }
+
+    // Stream ended — debate finished
+    if(DM_TIMER){clearInterval(DM_TIMER);DM_TIMER=null}
+    updateDmStats();
+    document.getElementById('dm-phase').innerHTML='<span class="badge badge-ok">✅ Terminé</span> <button class="btn btn-sm btn-secondary" style="margin-left:8px" onclick="finishMonitor()">Voir le résultat</button>';
+}
+
+function handleLiveEvent(evt,tl,pMap){
+    const t=evt.type;
+    DM_EVENT_COUNT++;
+
+    if(t==='debate_start'){
+        (evt.participants||[]).forEach(p=>{
+            pMap[p.id]=p;
+            // Init dashboard participant data
+            DM_PDATA[p.id]={icon:p.icon||'🤖',name:p.display_name||p.id,provider:p.provider||'?',persona:p.persona_name||'',tokens:0,turns_ok:0,turns_err:0,duration_ms:0,conf:0,thesis:'',tool_calls:0};
+        });
+        document.getElementById('dm-participants').innerHTML=
+            (evt.participants||[]).map(p=>`<span class="provider-badge ${providerClass(p.provider)}">${p.icon||'🤖'} ${esc(p.display_name)}</span>`).join('');
+        renderPCards();
+        updateKPIs();
+    }
+
+    if(t==='phase'){
+        const label=evt.phase==='opening'?'📖 Ouverture':evt.phase==='verdict'?'⚖️ Verdict':`💬 Round ${evt.round||'?'}`;
+        document.getElementById('dm-phase').innerHTML=`<span class="tl-phase-label">${label}</span>`;
+        if(evt.phase==='debate'&&evt.round) DM_CURRENT_ROUND=evt.round;
+        tl.innerHTML+=`<div class="tl-item tl-phase"><div class="tl-header"><span class="tl-phase-label">${label}</span></div></div>`;
+        updateKPIs();
+        scrollTl(tl);
+    }
+
+    if(t==='turn_start'){
+        const p=evt.participant||{};
+        pMap[p.id]=p;
+        tl.innerHTML+=`<div class="tl-item" id="live-turn-${p.id}-${evt.round||0}">
+            <div class="tl-header">
+                <span style="font-size:1.1rem">${p.icon||'🤖'}</span>
+                <span style="font-weight:600;color:var(--text)">${esc(p.display_name||p.id)}</span>
+                <span class="provider-badge ${providerClass(p.provider)}" style="font-size:0.68rem">${esc(p.provider||'')}</span>
+                <span style="font-size:0.72rem;color:var(--muted);margin-left:auto">⏳ En cours…</span>
+            </div>
+            <div style="color:var(--muted);font-size:0.82rem;font-style:italic">Réflexion en cours…</div>
+        </div>`;
+        scrollTl(tl);
+    }
+
+    if(t==='turn_end'){
+        const pid=evt.participant_id||evt.participant?.id;
+        const el=document.getElementById(`live-turn-${pid}-${evt.round||0}`);
+        if(el){
+            const p=pMap[pid]||evt.participant||{display_name:pid,icon:'🤖',provider:'?'};
+            const content=(evt.content||'').trim();
+            const pos=evt.position;
+            const isLong=content.length>300;
+            const uid='lv_'+Math.random().toString(36).substr(2,6);
+            let h=`<div class="tl-header">
+                <span style="font-size:1.1rem">${p.icon||'🤖'}</span>
+                <span style="font-weight:600;color:var(--text)">${esc(p.display_name||pid)}</span>
+                <span class="provider-badge ${providerClass(p.provider)}" style="font-size:0.68rem">${esc(p.provider||'')}</span>
+                <span style="font-size:0.72rem;color:var(--muted);margin-left:auto">${evt.tokens_used?evt.tokens_used+' tok':''} ${evt.duration_ms?(evt.duration_ms/1000).toFixed(1)+'s':''}</span>
+            </div>`;
+            if(evt.error) h+=`<div style="color:var(--red);font-size:0.83rem">❌ ${esc(evt.error)}</div>`;
+            else if(content){
+                h+=`<div class="tl-content${isLong?'':' expanded'}" id="${uid}"><div>${md(content)}</div>${isLong?'<div class="fade-out"></div>':''}</div>`;
+                if(isLong) h+=`<button class="tl-expand" onclick="toggleTlContent('${uid}',this)">▼ Voir plus</button>`;
+            }
+            if(pos&&!(pos.thesis||'').match(/pars/i)){
+                h+=`<div class="tl-position"><div class="pos-thesis">💭 ${escBr(pos.thesis||'')}</div><div class="pos-meta">Confiance : <span style="color:${confColor(pos.confidence||50)}">${pos.confidence||'?'}%</span></div></div>`;
+            }
+            el.innerHTML=h;
+            DM_TOKENS+=(evt.tokens_used||0);
+        }
+        // Dashboard: update participant data + confidence history
+        if(pid && DM_PDATA[pid]){
+            const d=DM_PDATA[pid];
+            d.tokens+=(evt.tokens_used||0);
+            d.duration_ms+=(evt.duration_ms||0);
+            if(evt.error){d.turns_err++}else{d.turns_ok++}
+            if(evt.position&&evt.position.confidence){d.conf=evt.position.confidence}
+            if(evt.position&&evt.position.thesis){d.thesis=evt.position.thesis}
+            if(evt.tool_calls){d.tool_calls+=(Array.isArray(evt.tool_calls)?evt.tool_calls.length:1)}
+            // Add to confidence history for this round
+            const rnd=evt.round||0;
+            let confEntry=DM_CONF_HISTORY.find(h=>h.round===rnd);
+            if(!confEntry){confEntry={round:rnd,participants:{}};DM_CONF_HISTORY.push(confEntry)}
+            if(evt.position&&evt.position.confidence){confEntry.participants[pid]=evt.position.confidence}
+            renderPCards();
+            renderConfChart();
+            updateKPIs();
+        }
+        scrollTl(tl);
+    }
+
+    if(t==='stability'){
+        const score=Math.round((evt.score||0)*100);
+        tl.innerHTML+=`<div class="tl-item" style="padding:8px 16px"><span style="font-size:0.78rem;color:var(--muted)">📊 Stabilité : <span style="color:${confColor(score)}">${score}%</span></span></div>`;
+        // Dashboard: update stability history
+        DM_STAB_HISTORY.push({round:evt.round||DM_CURRENT_ROUND,score:evt.score||0,threshold:evt.threshold||0.85,is_stable:evt.is_stable||false,can_stop:evt.can_stop||false});
+        renderStabChart();
+        updateKPIs();
+        scrollTl(tl);
+    }
+
+    if(t==='verdict'){
+        const vt=evt.verdict_type||'?';
+        tl.innerHTML+=`<div class="tl-item tl-verdict">
+            <div class="tl-header">
+                <span class="tl-phase-label" style="color:var(--green);background:rgba(65,168,144,0.1)">⚖️ Verdict</span>
+                <span class="badge ${verdictClass(vt)}">${verdictLabel(vt)}</span>
+                <span style="font-size:0.78rem;color:var(--muted)">Confiance ${evt.confidence||'?'}%</span>
+            </div>
+            <div style="font-size:0.85rem;color:var(--text);line-height:1.6;margin-top:8px">${md(evt.summary||'')}</div>
+        </div>`;
+        scrollTl(tl);
+    }
+
+    if(t==='error'){
+        tl.innerHTML+=`<div class="tl-item" style="border-color:var(--red)"><div style="color:var(--red)">❌ ${esc(evt.error||evt.reason||'Erreur')}</div></div>`;
+        scrollTl(tl);
+    }
+}
+
+function scrollTl(el){el.scrollTop=el.scrollHeight}
+
+async function stopDebate(){
+    if(!DM_DEBATE_ID){showToast('Pas de débat en cours',true);return}
+    const btn=document.getElementById('dm-stop-btn');
+    btn.disabled=true;
+    btn.textContent='⏳ Arrêt…';
+    try{
+        const resp=await fetch(`/api/v1/debates/${DM_DEBATE_ID}/cancel`,{method:'POST',headers:hdr()});
+        const d=await resp.json();
+        if(resp.ok){showToast('🛑 '+d.message)}
+        else{showToast('❌ '+(d.detail||d.message||'Erreur'),true)}
+    }catch(e){showToast('❌ '+e.message,true)}
+    btn.disabled=false;
+    btn.textContent='🛑 Arrêter';
+}
+
+function finishMonitor(){
+    document.getElementById('debate-monitor').classList.add('hidden');
+    if(DM_TIMER){clearInterval(DM_TIMER);DM_TIMER=null}
+    loadDebates();
+}
+
+/* ===== Export HTML — génère un fichier HTML téléchargeable ===== */
+async function exportDebateHTML(id){
+    const d=await api('/debates/'+id);
+    if(d.status!=='ok'||!d.debate)return alert('Erreur: débat non trouvé');
+    const db=d.debate;
+    const v=db.verdict;
+    const stats=db.stats||{};
+    const ps=db.participants||[];
+
+    // Build HTML document
+    let h=`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AdviceRoom — ${esc(db.question).substring(0,60)}</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:900px;margin:40px auto;padding:0 20px;color:#333;line-height:1.7;background:#fff}
+h1{color:#1a56db;border-bottom:2px solid #1a56db;padding-bottom:10px;font-size:1.4rem}
+h2{color:#374151;margin-top:30px;font-size:1.2rem;border-bottom:1px solid #e5e7eb;padding-bottom:6px}
+h3{color:#4b5563;font-size:1rem;margin-top:16px}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:0.9rem}
+th,td{border:1px solid #d1d5db;padding:8px 12px;text-align:left}
+th{background:#f3f4f6;font-weight:600}
+blockquote{border-left:3px solid #60a5fa;margin:10px 0;padding:5px 15px;background:#eff6ff}
+code{background:#f3f4f6;padding:2px 5px;border-radius:3px;font-size:0.9em}
+pre{background:#f3f4f6;padding:15px;border-radius:5px;overflow-x:auto}
+hr{border:none;border-top:1px solid #e5e7eb;margin:30px 0}
+.badge{display:inline-block;padding:3px 10px;border-radius:5px;font-size:0.85rem;font-weight:600}
+.badge-green{background:#d1fae5;color:#065f46}
+.badge-orange{background:#fef3c7;color:#92400e}
+.badge-red{background:#fee2e2;color:#991b1b}
+.turn{border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin:10px 0}
+.turn-header{font-weight:600;margin-bottom:6px;color:#1f2937}
+.position{background:#f0fdf4;border-left:3px solid #22c55e;padding:8px 12px;margin:8px 0;border-radius:4px}
+.challenge{background:#fff7ed;border-left:3px solid #f59e0b;padding:6px 10px;margin:6px 0;border-radius:4px;font-size:0.9rem}
+.meta{color:#6b7280;font-size:0.82rem}
+</style></head><body>`;
+
+    h+=`<h1>🏛️ AdviceRoom — Débat</h1>`;
+    h+=`<p><strong>Question :</strong> ${esc(db.question)}</p>`;
+    h+=`<p><strong>Date :</strong> ${db.created_at} — <strong>Statut :</strong> ${db.status}</p>`;
+
+    // Participants
+    h+=`<h2>👥 Participants</h2><ul>`;
+    for(const p of ps) h+=`<li><strong>${esc(p.display_name)}</strong> (${esc(p.provider)}) — ${esc(p.persona_name)} ${p.persona_icon||''}</li>`;
+    h+=`</ul>`;
+
+    // Stats
+    if(stats.total_tokens){
+        h+=`<h2>📊 Statistiques</h2><table><tr><th>Rounds</th><th>Tokens</th><th>Durée</th><th>Appels outils</th></tr>`;
+        h+=`<tr><td>${stats.total_rounds||0}</td><td>${stats.total_tokens||0}</td><td>${((stats.total_duration_ms||0)/1000).toFixed(1)}s</td><td>${stats.tool_calls_count||0}</td></tr></table>`;
+    }
+
+    // Verdict
+    if(v){
+        const vc=v.type==='consensus'?'green':v.type==='consensus_partiel'?'orange':'red';
+        h+=`<h2>⚖️ Verdict</h2>`;
+        h+=`<p><span class="badge badge-${vc}">${v.type.toUpperCase()}</span> — Confiance ${v.confidence}%</p>`;
+        if(v.summary) h+=`<div>${mdExport(v.summary)}</div>`;
+        if((v.agreement_points||[]).length){
+            h+=`<h3>✅ Points d'accord</h3><ul>`;
+            for(const a of v.agreement_points) h+=`<li>${mdExport(typeof a==='string'?a:JSON.stringify(a))}</li>`;
+            h+=`</ul>`;
+        }
+        if((v.divergence_points||[]).length){
+            h+=`<h3>❌ Divergences</h3><ul>`;
+            for(const d of v.divergence_points){const t=typeof d==='object'?(d.topic||JSON.stringify(d)):d;h+=`<li>${mdExport(t)}</li>`}
+            h+=`</ul>`;
+        }
+        if(v.recommendation) h+=`<h3>💡 Recommandation</h3><blockquote>${mdExport(v.recommendation)}</blockquote>`;
+        if((v.key_insights||[]).length){
+            h+=`<h3>🔍 Insights</h3><ul>`;
+            for(const i of v.key_insights) h+=`<li>${mdExport(typeof i==='string'?i:JSON.stringify(i))}</li>`;
+            h+=`</ul>`;
+        }
+    }
+
+    // Opening
+    const op=db.opening_turns||[];
+    if(op.length){
+        h+=`<h2>📖 Ouverture</h2>`;
+        for(const t of op) h+=exportTurnHTML(t,ps);
+    }
+
+    // Rounds
+    for(const rnd of (db.rounds||[])){
+        const stab=rnd.stability_score!=null?` — Stabilité ${Math.round(rnd.stability_score*100)}%`:'';
+        h+=`<h2>💬 Round ${rnd.number}${stab}</h2>`;
+        for(const t of (rnd.turns||[])) h+=exportTurnHTML(t,ps);
+    }
+
+    h+=`<hr><p style="color:#9ca3af;font-size:0.85rem"><em>Exporté depuis AdviceRoom — ${new Date().toLocaleString('fr-FR')}</em></p>`;
+    h+=`</body></html>`;
+
+    // Download
+    const blob=new Blob([h],{type:'text/html;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=`adviceroom-debate-${id.substring(0,8)}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+/* ===== Markdown → HTML for export (light theme, standard HTML) ===== */
+function mdExport(text){
+    if(!text)return '';
+    let s=esc(text);
+    // Code blocks ```...```
+    s=s.replace(/```(\w*)\n([\s\S]*?)```/g,'<pre><code>$2</code></pre>');
+    // Inline code
+    s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
+    // Headers (h1 à h4)
+    s=s.replace(/^#### (.+)$/gm,'<h4>$1</h4>');
+    s=s.replace(/^### (.+)$/gm,'<h3>$1</h3>');
+    s=s.replace(/^## (.+)$/gm,'<h2 style="font-size:1.1rem;margin-top:16px">$1</h2>');
+    s=s.replace(/^# (.+)$/gm,'<h1 style="font-size:1.3rem;margin-top:20px;border-bottom:1px solid #e5e7eb;padding-bottom:6px">$1</h1>');
+    // Bold + italic
+    s=s.replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>');
+    s=s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+    s=s.replace(/\*(.+?)\*/g,'<em>$1</em>');
+    // Links [text](url)
+    s=s.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" style="color:#1a56db">$1</a>');
+    // Horizontal rules
+    s=s.replace(/^---+$/gm,'<hr>');
+    // Tables
+    s=s.replace(/((?:^\|.+\|$\n?)+)/gm, function(block){
+        const rows=block.trim().split('\n').filter(r=>r.trim());
+        const dataRows=rows.filter(r=>!/^\|[\s\-:|]+\|$/.test(r));
+        if(!dataRows.length)return block;
+        let t='<table><tbody>';
+        dataRows.forEach((row,i)=>{
+            const cells=row.split('|').filter((_,idx)=>idx>0&&idx<row.split('|').length-1);
+            const tag=i===0?'th':'td';
+            t+='<tr>'+cells.map(c=>`<${tag}>${c.trim()}</${tag}>`).join('')+'</tr>';
+        });
+        return t+'</tbody></table>';
+    });
+    // Unordered lists (- ou *)
+    s=s.replace(/^[\-\*\+] (.+)$/gm,'<li>$1</li>');
+    s=s.replace(/((?:<li>.+<\/li>\n?)+)/g, function(m){
+        // Détecter si c'est une liste ordonnée (précédée par un chiffre) ou non
+        return '<ul>'+m+'</ul>';
+    });
+    // Ordered lists
+    s=s.replace(/^\d+\. (.+)$/gm,'<li>$1</li>');
+    s=s.replace(/((?:<li>.+<\/li>\n?)+)/g, function(m){
+        if(m.includes('<ul>'))return m; // déjà wrappé
+        return '<ol>'+m+'</ol>';
+    });
+    // Blockquotes (fusionner les consécutifs)
+    s=s.replace(/^&gt; (.+)$/gm,'<blockquote>$1</blockquote>');
+    s=s.replace(/<\/blockquote>\n?<blockquote>/g,'<br>');
+    // Restore <br> tags
+    s=s.replace(/&lt;br&gt;/gi,'<br>').replace(/&lt;br\/&gt;/gi,'<br>').replace(/&lt;br \/&gt;/gi,'<br>');
+    // Paragraphs (double newline)
+    s=s.replace(/\n\n/g,'<br><br>');
+    s=s.replace(/\n/g,'<br>');
+    // Clean LaTeX-like symbols
+    s=s.replace(/\$\\rightarrow\$/g,'→').replace(/\$\\leftarrow\$/g,'←').replace(/\$\\times\$/g,'×').replace(/\$\\geq?\$/g,'≥').replace(/\$\\leq?\$/g,'≤');
+    return s;
+}
+
+function exportTurnHTML(t,ps){
+    const p=ps.find(x=>x.id===t.participant_id)||{display_name:t.participant_id,persona_icon:'🤖',provider:'?',persona_name:''};
+    let h=`<div class="turn"><div class="turn-header">${p.persona_icon||'🤖'} ${esc(p.display_name)} — ${esc(p.persona_name)} [${esc(p.provider)}]</div>`;
+    if(t.error){h+=`<p style="color:red">❌ ${esc(t.error)}</p>`}
+    else if(t.content){h+=`<div>${mdExport(t.content)}</div>`}
+    if(t.position&&!(t.position.thesis||'').match(/pars/i)){
+        h+=`<div class="position"><strong>💭 ${esc(t.position.thesis||'')}</strong><br><span class="meta">Confiance ${t.position.confidence||'?'}%${(t.position.arguments||[]).length?' · '+t.position.arguments.length+' arguments':''}</span></div>`;
+        if(t.position.challenged) h+=`<div class="challenge">⚔️ Challenge → ${esc(t.position.challenged)}</div>`;
+    }
+    const tok=t.tokens_used||0;const dur=t.duration_ms||0;
+    if(tok||dur) h+=`<div class="meta">${tok?tok+' tokens':''}${tok&&dur?' · ':''}${dur?(dur<1000?dur+'ms':(dur/1000).toFixed(1)+'s'):''}</div>`;
+    h+=`</div>`;
+    return h;
+}
+
+/* ===== DELETE DEBATE (inline confirmation, no browser popup) ===== */
+let _deleteTarget=null;
+function deleteDebate(id){
+    _deleteTarget=id;
+    // Show inline confirmation banner at top of content
+    let banner=document.getElementById('delete-confirm-banner');
+    if(!banner){
+        banner=document.createElement('div');
+        banner.id='delete-confirm-banner';
+        banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:999;background:rgba(232,93,93,0.95);color:#fff;padding:16px 24px;display:flex;align-items:center;gap:16px;justify-content:center;font-size:0.9rem;backdrop-filter:blur(8px)';
+        document.body.appendChild(banner);
+    }
+    banner.innerHTML=`
+        <span>⚠️ Supprimer définitivement ce débat ? <strong>Irréversible.</strong></span>
+        <button onclick="confirmDelete()" style="background:#fff;color:var(--red);border:none;padding:6px 16px;border-radius:6px;font-weight:700;cursor:pointer;font-size:0.85rem">🗑️ Confirmer</button>
+        <button onclick="cancelDelete()" style="background:transparent;color:#fff;border:1px solid #fff;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem">Annuler</button>
+    `;
+    banner.style.display='flex';
+}
+function cancelDelete(){
+    _deleteTarget=null;
+    const b=document.getElementById('delete-confirm-banner');
+    if(b)b.style.display='none';
+}
+async function confirmDelete(){
+    const id=_deleteTarget;
+    if(!id)return;
+    cancelDelete();
+    try{
+        const d=await api('/debates/'+id,{method:'DELETE'});
+        if(d.status==='ok'){
+            // Show success toast
+            showToast('✅ Débat supprimé de : '+(d.deleted_from||[]).join(', '));
+            closeViewer();
+            loadDebates();
+        } else {
+            showToast('❌ Erreur : '+(d.message||'Suppression échouée'), true);
+        }
+    }catch(e){
+        showToast('❌ Erreur : '+e.message, true);
+    }
+}
+function showToast(msg, isError){
+    let toast=document.getElementById('ar-toast');
+    if(!toast){
+        toast=document.createElement('div');
+        toast.id='ar-toast';
+        toast.style.cssText='position:fixed;bottom:24px;right:24px;z-index:999;padding:12px 20px;border-radius:8px;font-size:0.85rem;max-width:400px;transition:opacity 0.3s;box-shadow:0 4px 16px rgba(0,0,0,0.3)';
+        document.body.appendChild(toast);
+    }
+    toast.style.background=isError?'var(--red)':'var(--accent)';
+    toast.style.color='#fff';
+    toast.textContent=msg;
+    toast.style.opacity='1';
+    toast.style.display='block';
+    setTimeout(()=>{toast.style.opacity='0';setTimeout(()=>{toast.style.display='none'},300)},3000);
+}
+
+function closeViewer(){
+    document.getElementById('debate-viewer').classList.remove('active');
+    document.getElementById('debate-viewer').innerHTML='';
+    document.getElementById('debates-list-view').style.display='';
+}
+
+/* ===== TOKENS ===== */
+async function loadTokens(){
+    const d=await api('/tokens');
+    const b=document.getElementById('tokens-body');b.innerHTML='';
+    (d.tokens||[]).forEach(t=>{
+        b.innerHTML+=`<tr>
+            <td>${esc(t.client_name)}</td>
+            <td>${(t.permissions||[]).join(', ')}</td>
+            <td style="color:var(--muted)">${esc(t.email||'—')}</td>
+            <td><code style="font-size:0.75rem">${t.hash_prefix}…</code></td>
+            <td><span class="badge ${t.revoked?'badge-err':'badge-ok'}">${t.revoked?'Révoqué':'Actif'}</span></td>
+            <td><button class="btn btn-sm btn-danger" onclick="revokeToken('${t.hash_prefix}')">Révoquer</button></td>
+        </tr>`;
+    });
+}
+
+function showCreateToken(){document.getElementById('create-token-form').classList.toggle('hidden')}
+
+async function createToken(){
+    const n=document.getElementById('new-name').value.trim();
+    if(!n)return;
+    const d=await api('/tokens',{method:'POST',body:JSON.stringify({
+        client_name:n,
+        permissions:document.getElementById('new-perm').value.split(','),
+        email:document.getElementById('new-email').value.trim()
+    })});
+    const r=document.getElementById('token-result');
+    if(d.raw_token){
+        r.innerHTML=`<div style="background:rgba(65,168,144,0.1);border:1px solid var(--accent);padding:14px;border-radius:8px;margin-top:8px">
+            <strong style="color:var(--accent)">⚠️ Token (affiché une seule fois) :</strong><br>
+            <code style="color:var(--accent);word-break:break-all;font-size:0.85rem">${d.raw_token}</code>
+        </div>`;
+        loadTokens();
+    } else {
+        r.innerHTML=`<span style="color:var(--red)">Erreur: ${d.message||'?'}</span>`;
+    }
+}
+
+async function revokeToken(p){
+    if(!confirm('Révoquer le token '+p+'… ?'))return;
+    await api('/tokens/'+p,{method:'DELETE'});
+    loadTokens();
+}
+
+/* ===== Activity sub-tabs ===== */
+function showActivityTab(tab){
+    document.getElementById('act-tab-llm').classList.toggle('active',tab==='llm');
+    document.getElementById('act-tab-web').classList.toggle('active',tab==='web');
+    document.getElementById('act-tab-llm').style.borderBottom=tab==='llm'?'2px solid var(--accent)':'none';
+    document.getElementById('act-tab-web').style.borderBottom=tab==='web'?'2px solid var(--accent)':'none';
+    document.getElementById('act-panel-llm').style.display=tab==='llm'?'':'none';
+    document.getElementById('act-panel-web').style.display=tab==='web'?'':'none';
+}
+
+/* ===== LOGS (2 sections) ===== */
+async function loadLogs(){
+    // Section 1 : Activité LLM
+    loadLlmActivity();
+    // Section 2 : Activité web technique
+    loadWebLogs();
+}
+
+async function loadLlmActivity(){
+    const c=document.getElementById('llm-activity-list');
+    try{
+        const d=await api('/llm-activity');
+        if(!d.logs||!d.logs.length){c.innerHTML='<span style="color:var(--muted)">Aucune activité LLM (lancez un débat)</span>';return}
+        c.innerHTML='';
+        d.logs.forEach(l=>{
+            const ts=new Date(l.timestamp*1000).toLocaleTimeString();
+            const isErr=l.status==='error';
+            const isVerdict=l.type==='verdict';
+            const icon=isVerdict?'⚖️':isErr?'❌':'🤖';
+            const sc=isErr?'err':isVerdict?'ok':'ok';
+            const durStr=l.duration_ms?(l.duration_ms<1000?l.duration_ms+'ms':(l.duration_ms/1000).toFixed(1)+'s'):'';
+            const tokStr=l.tokens?l.tokens+' tok':'';
+            const confStr=l.confidence?`conf ${l.confidence}%`:'';
+
+            let line=`<div class="log-entry" style="padding:6px 0;border-bottom:1px solid var(--border)">`;
+            line+=`<span style="color:var(--muted)">${ts}</span> `;
+            line+=`${icon} `;
+            if(l.type==='verdict'){
+                line+=`<span style="color:var(--accent);font-weight:600">VERDICT</span> `;
+                line+=`<span class="provider-badge ${providerClass(l.provider)}" style="font-size:0.68rem">${esc(l.model)}</span> `;
+            } else {
+                line+=`<span class="provider-badge ${providerClass(l.provider)}" style="font-size:0.68rem">${esc(l.participant||l.model)}</span> `;
+                if(l.persona) line+=`<span style="font-size:0.72rem;color:var(--text2);font-style:italic">${esc(l.persona)}</span> `;
+                line+=`<span style="color:var(--muted);font-size:0.72rem">${esc(l.phase)} R${l.round||0}</span> `;
+            }
+            line+=`<span class="${sc}">${esc(l.status)}</span> `;
+            if(tokStr) line+=`<span style="color:var(--muted);font-size:0.72rem">${tokStr}</span> `;
+            if(durStr) line+=`<span style="color:var(--muted);font-size:0.72rem">${durStr}</span> `;
+            if(confStr) line+=`<span style="color:${confColor(l.confidence)};font-size:0.72rem">${confStr}</span> `;
+            if(l.tool_calls) line+=`<span style="font-size:0.72rem;color:var(--muted)">🔧×${l.tool_calls}</span> `;
+            if(l.thesis) line+=`<div style="font-size:0.72rem;color:var(--text2);margin-top:2px;padding-left:20px">💭 ${esc(l.thesis)}</div>`;
+            if(l.error) line+=`<div style="font-size:0.72rem;color:var(--red);margin-top:2px;padding-left:20px">❌ ${esc(l.error)}</div>`;
+            if(l.details&&l.type==='verdict') line+=`<div style="font-size:0.72rem;color:var(--text2);margin-top:2px;padding-left:20px">${esc(l.details)}</div>`;
+            if(l.debate_id) line+=`<span style="font-size:0.65rem;color:var(--muted);float:right">🏛️ ${l.debate_id}</span>`;
+            line+=`</div>`;
+            c.innerHTML+=line;
+        });
+    }catch(e){
+        c.innerHTML='<span style="color:var(--red)">Erreur chargement activité LLM</span>';
+    }
+}
+
+async function loadWebLogs(){
+    const d=await api('/logs');
+    const c=document.getElementById('logs-list');
+    if(!d.logs||!d.logs.length){c.innerHTML='<span style="color:var(--muted)">Aucune activité</span>';return}
+    c.innerHTML='';
+    d.logs.reverse().forEach(l=>{
+        const ts=new Date(l.timestamp*1000).toLocaleTimeString();
+        const sc=l.status>=400?'err':'ok';
+        c.innerHTML+=`<div class="log-entry"><span style="color:var(--muted)">${ts}</span> <span class="method">${l.method}</span> ${l.path} → <span class="${sc}">${l.status}</span> <span style="color:var(--muted)">(${l.duration_ms}ms)</span></div>`;
+    });
+}
+
+/* ===== Auto-refresh & Auto-login ===== */
+setInterval(()=>{if(!document.getElementById('tab-activity').classList.contains('hidden'))loadLogs()},5000);
+
+// Auto-login si token sauvegardé (silencieux, pas de popup)
+const saved=localStorage.getItem('ar_token');
+if(saved){
+    document.getElementById('login-token').value=saved;
+    doLogin();
+}
+</script>
+</body>
+</html>

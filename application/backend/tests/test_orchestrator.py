@@ -55,8 +55,8 @@ MOCK_PERSONAS_CONFIG = {
 }
 
 MOCK_PROMPTS = {
-    "opening": {"system": "Tu es {persona_name} — {persona_description}\n{n_participants} participants."},
-    "debate": {"system": "Tu es {persona_name} — {persona_description}\nQ: {question}\n{user_answers_if_any}\nPositions:\n{formatted_previous_positions}\nRound {round_number}\n{user_question_instruction}"},
+    "opening": {"system": "Tu es {participant_id} / {persona_name} — {persona_description}\n{n_participants} participants."},
+    "debate": {"system": "Tu es {participant_id} / {persona_name} — {persona_description}\nQ: {question}\n{user_answers_if_any}\nPositions:\n{formatted_previous_positions}\nRound {round_number}\n{user_question_instruction}"},
     "verdict": {"system": "Verdict: {question}\nUser: {user_answers}\nOpening:\n{formatted_opening_positions}\nRounds:\n{formatted_rounds}"},
     "challenge_retry": "Challenge requis.\n{other_positions}",
 }

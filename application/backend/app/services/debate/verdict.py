@@ -18,9 +18,10 @@ from typing import Any, Dict, Optional
 
 from .context_builder import ContextBuilder
 from .models import Debate, Verdict, VerdictType
-from .parser import parse_verdict
+from .parser import parse_verdict, safe_confidence
 from ..llm.base import BaseLLMProvider, LLMResponse
 from ..llm.router import get_llm_router
+from ..tools.executor import get_tool_executor
 from ...config.loader import get_debate_config
 
 logger = logging.getLogger(__name__)
@@ -148,9 +149,14 @@ class VerdictSynthesizer:
             )
 
         try:
+            # Outils disponibles pour le synthétiseur (recherche web, etc.)
+            tool_executor = get_tool_executor()
+            tools = tool_executor.get_tool_definitions() if tool_executor.available else None
+
             # Appel LLM non-streaming (le verdict est parsé en entier)
             response: LLMResponse = await provider.chat_completion(
                 messages=messages,
+                tools=tools,  # Tous les modèles doivent pouvoir utiliser leurs tools
                 temperature=0.3,  # Bas pour un verdict factuel
                 model_override=model_config.api_model_id,
             )
@@ -209,7 +215,7 @@ class VerdictSynthesizer:
         # Construire l'objet Verdict
         verdict = Verdict(
             type=verdict_type,
-            confidence=int(verdict_data.get("confidence", 0)),
+            confidence=safe_confidence(verdict_data.get("confidence"), 0),
             summary=verdict_data.get("summary", prose),
             agreement_points=verdict_data.get("agreement_points", []) or [],
             divergence_points=verdict_data.get("divergence_points", []) or [],

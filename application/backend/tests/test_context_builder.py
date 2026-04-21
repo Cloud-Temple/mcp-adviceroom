@@ -35,13 +35,13 @@ from tests.conftest import make_participant
 MOCK_PROMPTS = {
     "opening": {
         "system": (
-            "Tu es {persona_name} — {persona_description}\n"
+            "Tu es {participant_id} / {persona_name} — {persona_description}\n"
             "Débat avec {n_participants} participants."
         ),
     },
     "debate": {
         "system": (
-            "Tu es {persona_name} — {persona_description}\n"
+            "Tu es {participant_id} / {persona_name} — {persona_description}\n"
             "Question: {question}\n"
             "{user_answers_if_any}\n"
             "Positions:\n{formatted_previous_positions}\n"

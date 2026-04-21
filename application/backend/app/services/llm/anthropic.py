@@ -50,6 +50,7 @@ class AnthropicProvider(BaseLLMProvider):
             "ANTHROPIC_API_URL", _ANTHROPIC_API_BASE
         ).rstrip("/")
         self.default_model = os.getenv("ANTHROPIC_DEFAULT_MODEL", "claude-opus-4.6")
+        self._default_max_tokens = int(os.getenv("ANTHROPIC_MAX_TOKENS", "64000"))
 
     def _headers(self) -> Dict[str, str]:
         """Headers d'authentification Anthropic."""
@@ -78,9 +79,14 @@ class AnthropicProvider(BaseLLMProvider):
         - role "user"      → role "user"
         - role "assistant" → role "assistant"
         - role "tool"      → role "user" avec tool_result content block
+
+        IMPORTANT : L'API Anthropic exige une alternance stricte user/assistant.
+        Les messages consécutifs de même rôle sont fusionnés automatiquement.
+        C'est critique pour les tool results (role "tool" → "user") qui suivent
+        d'autres messages "user" ou d'autres "tool" results.
         """
         system_text = None
-        anthropic_messages = []
+        raw_messages = []
 
         for msg in messages:
             role = msg.get("role", "user")
@@ -92,7 +98,7 @@ class AnthropicProvider(BaseLLMProvider):
                 continue
 
             if role == "user":
-                anthropic_messages.append({"role": "user", "content": content})
+                raw_messages.append({"role": "user", "content": content})
 
             elif role == "assistant":
                 # Assistant avec tool_calls → content blocks
@@ -115,11 +121,11 @@ class AnthropicProvider(BaseLLMProvider):
 
                 if not blocks:
                     blocks.append({"type": "text", "text": ""})
-                anthropic_messages.append({"role": "assistant", "content": blocks})
+                raw_messages.append({"role": "assistant", "content": blocks})
 
             elif role == "tool":
                 # Tool result → user message avec tool_result block
-                anthropic_messages.append({
+                raw_messages.append({
                     "role": "user",
                     "content": [{
                         "type": "tool_result",
@@ -127,6 +133,30 @@ class AnthropicProvider(BaseLLMProvider):
                         "content": content,
                     }],
                 })
+
+        # ────────────────────────────────────────────────────────────
+        # Fusion des messages consécutifs de même rôle
+        # L'API Anthropic EXIGE une alternance stricte user/assistant.
+        # Sans cette fusion, les tool results (convertis en "user")
+        # créent des messages user consécutifs → Opus retourne content=[].
+        # ────────────────────────────────────────────────────────────
+        anthropic_messages = []
+        for msg in raw_messages:
+            if anthropic_messages and anthropic_messages[-1]["role"] == msg["role"]:
+                # Fusionner avec le message précédent de même rôle
+                prev = anthropic_messages[-1]
+                prev_content = prev["content"]
+                curr_content = msg["content"]
+
+                # Normaliser en liste de content blocks pour la fusion
+                if isinstance(prev_content, str):
+                    prev_content = [{"type": "text", "text": prev_content}]
+                if isinstance(curr_content, str):
+                    curr_content = [{"type": "text", "text": curr_content}]
+
+                prev["content"] = prev_content + curr_content
+            else:
+                anthropic_messages.append(msg)
 
         return system_text, anthropic_messages
 
@@ -177,6 +207,11 @@ class AnthropicProvider(BaseLLMProvider):
         for block in content_blocks:
             if block.get("type") == "text":
                 text_parts.append(block.get("text", ""))
+            elif block.get("type") == "thinking":
+                # Claude extended thinking — inclure le contenu pensé
+                thinking_text = block.get("thinking", "")
+                if thinking_text:
+                    text_parts.append(thinking_text)
             elif block.get("type") == "tool_use":
                 tool_calls.append({
                     "id": block.get("id", f"call_{uuid.uuid4().hex[:8]}"),
@@ -209,6 +244,17 @@ class AnthropicProvider(BaseLLMProvider):
             ),
         }
 
+        # Diagnostic : si aucun texte extrait malgré des tokens → log les block types
+        if not text_parts and not tool_calls:
+            block_types = [b.get("type", "?") for b in content_blocks]
+            logger.warning(
+                f"⚠ Anthropic réponse sans texte ni tools — "
+                f"stop_reason={stop_reason}, "
+                f"block_types={block_types}, "
+                f"usage={usage}, "
+                f"content_blocks_count={len(content_blocks)}"
+            )
+
         return LLMResponse(
             content="\n".join(text_parts) if text_parts else None,
             tool_calls=tool_calls if tool_calls else None,
@@ -239,7 +285,7 @@ class AnthropicProvider(BaseLLMProvider):
         payload: Dict[str, Any] = {
             "model": model,
             "messages": anthropic_msgs,
-            "max_tokens": max_tokens or 4096,
+            "max_tokens": max_tokens or self._default_max_tokens,
             "temperature": temperature,
         }
 
@@ -250,7 +296,23 @@ class AnthropicProvider(BaseLLMProvider):
             payload["tools"] = self._openai_tools_to_anthropic(tools)
 
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            # DEBUG OPUS: log payload envoyé (print pour éviter troncature Rich)
+            _dbg_roles = [m.get('role','?') for m in payload.get('messages',[])]
+            _dbg_msg_lens = [len(json.dumps(m.get('content',''))) for m in payload.get('messages',[])]
+            print(f"\n{'='*80}")
+            print(f"🔍 OPUS DEBUG SEND")
+            print(f"  model        = {payload.get('model')}")
+            print(f"  max_tokens   = {payload.get('max_tokens')}")
+            print(f"  temperature  = {payload.get('temperature')}")
+            print(f"  system_len   = {len(payload.get('system',''))} chars")
+            print(f"  messages     = {len(payload.get('messages',[]))} msgs")
+            print(f"  has_tools    = {'tools' in payload}")
+            print(f"  msg_roles    = {_dbg_roles}")
+            print(f"  msg_sizes    = {_dbg_msg_lens}")
+            print(f"  total_payload= {len(json.dumps(payload))} chars")
+            print(f"{'='*80}\n", flush=True)
+
+            async with httpx.AsyncClient(timeout=180.0) as client:
                 response = await client.post(
                     f"{self.base_url}/v1/messages",
                     headers=self._headers(),
@@ -258,6 +320,67 @@ class AnthropicProvider(BaseLLMProvider):
                 )
                 response.raise_for_status()
                 data = response.json()
+
+            # DEBUG OPUS: log réponse reçue (print pour éviter troncature Rich)
+            content_blocks = data.get("content", [])
+            usage_data = data.get("usage", {})
+            _block_types = [b.get('type','?') for b in content_blocks]
+            _has_text = any(b.get('text','').strip() for b in content_blocks if b.get('type')=='text')
+            _text_preview = ""
+            for b in content_blocks:
+                if b.get('type') == 'text' and b.get('text','').strip():
+                    _text_preview = b['text'][:200]
+                    break
+            print(f"\n{'='*80}")
+            print(f"🔍 OPUS DEBUG RECV")
+            print(f"  id           = {data.get('id','?')}")
+            print(f"  model        = {data.get('model','?')}")
+            print(f"  stop_reason  = {data.get('stop_reason','?')}")
+            print(f"  blocks       = {len(content_blocks)} ({_block_types})")
+            print(f"  input_tok    = {usage_data.get('input_tokens',0)}")
+            print(f"  output_tok   = {usage_data.get('output_tokens',0)}")
+            print(f"  has_text     = {_has_text}")
+            print(f"  text_preview = {_text_preview[:200] if _text_preview else '(VIDE)'}")
+            if not _has_text:
+                print(f"  ⚠️ FULL CONTENT = {json.dumps(content_blocks, ensure_ascii=False)[:2000]}")
+            print(f"{'='*80}\n", flush=True)
+
+            has_text = _has_text
+            _has_tool_use = any(b.get('type') == 'tool_use' for b in content_blocks)
+
+            # Ne retry que si la réponse est VRAIMENT vide (ni texte, ni tool_use)
+            # Les tool_use blocks sont une réponse valide — le modèle veut utiliser ses outils !
+            if not has_text and not _has_tool_use:
+                logger.warning(f"⚠ Anthropic content vide (pas de texte ni tool_use) — retry avec thinking")
+                # Retry avec extended thinking activé (force Opus à produire du contenu)
+                logger.info(f"🔄 Retry Anthropic avec thinking activé pour {model}")
+                thinking_payload = {
+                    "model": model,
+                    "messages": anthropic_msgs,
+                    "max_tokens": max_tokens or self._default_max_tokens,
+                    "temperature": 1.0,  # Requis quand thinking est activé
+                    "thinking": {
+                        "type": "enabled",
+                        "budget_tokens": 8000,
+                    },
+                }
+                if system_text:
+                    thinking_payload["system"] = system_text
+
+                async with httpx.AsyncClient(timeout=180.0) as client2:
+                    response2 = await client2.post(
+                        f"{self.base_url}/v1/messages",
+                        headers=self._headers(),
+                        json=thinking_payload,
+                    )
+                    response2.raise_for_status()
+                    data = response2.json()
+                    content_blocks2 = data.get("content", [])
+                    logger.info(
+                        f"✓ Anthropic thinking retry — "
+                        f"blocks={len(content_blocks2)}, "
+                        f"types={[b.get('type','?') for b in content_blocks2]}"
+                    )
 
             return self._anthropic_response_to_openai(data, model)
 
@@ -307,7 +430,7 @@ class AnthropicProvider(BaseLLMProvider):
         payload: Dict[str, Any] = {
             "model": model,
             "messages": anthropic_msgs,
-            "max_tokens": max_tokens or 4096,
+            "max_tokens": max_tokens or self._default_max_tokens,
             "temperature": temperature,
             "stream": True,
         }
@@ -319,7 +442,7 @@ class AnthropicProvider(BaseLLMProvider):
             payload["tools"] = self._openai_tools_to_anthropic(tools)
 
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=180.0) as client:
                 async with client.stream(
                     "POST",
                     f"{self.base_url}/v1/messages",
