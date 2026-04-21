@@ -44,8 +44,8 @@ services:
   backend:
     build: ./application/backend
     env_file: .env
-    ports:
-      - "8000:8000"   # Accès direct (dev/debug)
+    # V1-06 : port interne uniquement (pas de bypass WAF)
+    # Pour le dev local, décommenter: ports: ["8000:8000"]
     expose:
       - "8000"
     depends_on:
@@ -65,8 +65,8 @@ services:
   # Build multi-stage : Vite build → nginx sur port 3000
   frontend:
     build: ./application/frontend
-    ports:
-      - "3000:3000"   # Accès direct (dev/debug)
+    # V1-17 : port interne uniquement (pas de bypass WAF)
+    # Pour le dev local, décommenter: ports: ["3000:3000"]
     expose:
       - "3000"
     restart: unless-stopped

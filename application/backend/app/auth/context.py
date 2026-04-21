@@ -100,3 +100,67 @@ def is_admin() -> bool:
     if info is None:
         return False
     return "admin" in info.get("permissions", [])
+
+
+# =============================================================================
+# Dépendances FastAPI (Depends) — pour les routes REST
+# =============================================================================
+
+
+def require_auth() -> dict:
+    """
+    Dépendance FastAPI : exige un token valide.
+
+    Usage dans un router :
+        @router.get("/route")
+        async def ma_route(token_info: dict = Depends(require_auth)):
+            ...
+
+    Returns:
+        dict token_info si authentifié
+
+    Raises:
+        HTTPException 401 si pas de token
+    """
+    from fastapi import HTTPException
+
+    token_info = current_token_info.get()
+    if token_info is None:
+        raise HTTPException(status_code=401, detail="Authentification requise")
+    return token_info
+
+
+def require_read() -> dict:
+    """
+    Dépendance FastAPI : exige un token avec permission read (ou admin).
+
+    Raises:
+        HTTPException 401/403
+    """
+    from fastapi import HTTPException
+
+    token_info = current_token_info.get()
+    if token_info is None:
+        raise HTTPException(status_code=401, detail="Authentification requise")
+    perms = token_info.get("permissions", [])
+    if "read" not in perms and "admin" not in perms:
+        raise HTTPException(status_code=403, detail="Permission 'read' requise")
+    return token_info
+
+
+def require_write() -> dict:
+    """
+    Dépendance FastAPI : exige un token avec permission write (ou admin).
+
+    Raises:
+        HTTPException 401/403
+    """
+    from fastapi import HTTPException
+
+    token_info = current_token_info.get()
+    if token_info is None:
+        raise HTTPException(status_code=401, detail="Authentification requise")
+    perms = token_info.get("permissions", [])
+    if "write" not in perms and "admin" not in perms:
+        raise HTTPException(status_code=403, detail="Permission 'write' requise")
+    return token_info

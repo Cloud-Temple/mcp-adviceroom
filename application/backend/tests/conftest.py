@@ -13,6 +13,15 @@ from app.services.debate.models import Participant
 
 
 # ============================================================
+# Auth helpers pour les tests (V1-01 : toutes les routes sont authentifiées)
+# ============================================================
+
+# Le bootstrap key par défaut dans settings.py
+TEST_BOOTSTRAP_KEY = "changeme-in-production"
+TEST_AUTH_HEADERS = {"Authorization": f"Bearer {TEST_BOOTSTRAP_KEY}"}
+
+
+# ============================================================
 # Données de test : config personas.yaml (identique au vrai fichier)
 # ============================================================
 

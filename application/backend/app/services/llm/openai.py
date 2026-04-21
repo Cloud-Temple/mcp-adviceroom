@@ -116,7 +116,7 @@ class OpenAIProvider(BaseLLMProvider):
         except Exception as e:
             logger.error(f"✗ OpenAI erreur : {e}")
             return LLMResponse(
-                content=f"Erreur OpenAI : {str(e)}",
+                content="Erreur temporaire du provider OpenAI",
                 finish_reason="error",
                 model=model,
                 provider=self.provider_name,
@@ -207,7 +207,7 @@ class OpenAIProvider(BaseLLMProvider):
         except Exception as e:
             logger.error(f"✗ OpenAI stream erreur : {e}")
             yield LLMStreamChunk(
-                delta_content=f"Erreur OpenAI streaming : {str(e)}",
+                delta_content="Erreur temporaire du provider OpenAI (streaming)",
                 finish_reason="error",
                 model=model,
                 provider=self.provider_name,

@@ -220,9 +220,7 @@ def main():
             file=sys.stderr,
         )
 
-    # Initialiser le Token Store S3
-    from .auth.token_store import init_token_store
-    init_token_store()
+    # V1-13 : init_token_store() supprimé ici (déjà fait dans create_app())
 
     uvicorn.run(
         app,

@@ -116,7 +116,7 @@ class LLMaaSProvider(BaseLLMProvider):
         except Exception as e:
             logger.error(f"✗ LLMaaS erreur : {e}")
             return LLMResponse(
-                content=f"Erreur LLMaaS : {str(e)}",
+                content="Erreur temporaire du provider LLMaaS",
                 finish_reason="error",
                 model=model,
                 provider=self.provider_name,
@@ -206,7 +206,7 @@ class LLMaaSProvider(BaseLLMProvider):
         except Exception as e:
             logger.error(f"✗ LLMaaS stream erreur : {e}")
             yield LLMStreamChunk(
-                delta_content=f"Erreur LLMaaS streaming : {str(e)}",
+                delta_content="Erreur temporaire du provider LLMaaS (streaming)",
                 finish_reason="error",
                 model=model,
                 provider=self.provider_name,

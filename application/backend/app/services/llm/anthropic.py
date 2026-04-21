@@ -398,7 +398,7 @@ class AnthropicProvider(BaseLLMProvider):
         except Exception as e:
             logger.error(f"✗ Anthropic erreur : {e}")
             return LLMResponse(
-                content=f"Erreur Anthropic : {str(e)}",
+                content="Erreur temporaire du provider Anthropic",
                 finish_reason="error",
                 model=model,
                 provider=self.provider_name,
@@ -538,7 +538,7 @@ class AnthropicProvider(BaseLLMProvider):
         except Exception as e:
             logger.error(f"✗ Anthropic stream erreur : {e}")
             yield LLMStreamChunk(
-                delta_content=f"Erreur Anthropic streaming : {str(e)}",
+                delta_content="Erreur temporaire du provider Anthropic (streaming)",
                 finish_reason="error",
                 model=model,
                 provider=self.provider_name,

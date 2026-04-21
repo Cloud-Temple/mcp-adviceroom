@@ -2,16 +2,17 @@
 Tests API — Endpoints REST (debates + providers).
 
 Couvre :
-- POST /api/v1/debates → création de débat
-- GET  /api/v1/debates → listing
-- GET  /api/v1/debates/:id → statut
-- GET  /api/v1/providers → listing des modèles
-- GET  /health → health check
-- GET  /api/v1/info → informations service
+- POST /api/v1/debates → création de débat (write)
+- GET  /api/v1/debates → listing (read)
+- GET  /api/v1/debates/:id → statut (read)
+- GET  /api/v1/providers → listing des modèles (read)
+- GET  /health → health check (public)
 
 Tous les tests utilisent le TestClient FastAPI avec mocks.
+Les routes authentifiées utilisent le bootstrap key par défaut (V1-01).
 
 Ref: DESIGN/architecture.md §4.2.1
+Sécurité: DESIGN/SECURITY_AUDIT_V1.md V1-01
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -19,6 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 
 from app.services.llm.base import ModelConfig
+from tests.conftest import TEST_AUTH_HEADERS
 
 
 # ============================================================
@@ -113,14 +115,14 @@ def client(mock_all):
 
 
 # ============================================================
-# Tests Health Check
+# Tests Health Check (public — pas d'auth requise)
 # ============================================================
 
 class TestHealthCheck:
     """Tests du health check endpoint."""
 
     def test_health_returns_ok(self, client):
-        """GET /health → 200 OK."""
+        """GET /health → 200 OK (public, sans auth)."""
         response = client.get("/health")
         assert response.status_code == 200
         data = response.json()
@@ -135,47 +137,60 @@ class TestHealthCheck:
 
 
 # ============================================================
-# Tests Info
+# Tests Auth — Vérifier que les routes rejettent sans token (V1-01)
 # ============================================================
 
-class TestInfo:
-    """Tests de l'endpoint info."""
+class TestAuthRequired:
+    """Tests que toutes les routes API exigent un token valide."""
 
-    def _disabled_test_info_returns_service(self, client):
-        """GET /api/v1/info → 200 avec service name."""
-        response = client.get("/api/v1/info")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["service"] == "adviceroom"
+    def test_list_debates_without_token_returns_401(self, client):
+        """GET /api/v1/debates sans token → 401."""
+        response = client.get("/api/v1/debates")
+        assert response.status_code == 401
+
+    def test_list_providers_without_token_returns_401(self, client):
+        """GET /api/v1/providers sans token → 401."""
+        response = client.get("/api/v1/providers")
+        assert response.status_code == 401
+
+    def test_create_debate_without_token_returns_401(self, client):
+        """POST /api/v1/debates sans token → 401."""
+        response = client.post("/api/v1/debates", json={
+            "question": "Test ?",
+            "participants": [
+                {"provider": "llmaas", "model": "model-a"},
+                {"provider": "llmaas", "model": "model-b"},
+            ],
+        })
+        assert response.status_code == 401
 
 
 # ============================================================
-# Tests Providers
+# Tests Providers (avec auth)
 # ============================================================
 
 class TestProvidersAPI:
     """Tests de l'API providers."""
 
     def test_list_providers(self, client):
-        """GET /api/v1/providers → 200 avec catégories."""
-        response = client.get("/api/v1/providers")
+        """GET /api/v1/providers avec auth → 200 avec catégories."""
+        response = client.get("/api/v1/providers", headers=TEST_AUTH_HEADERS)
         assert response.status_code == 200
         data = response.json()
         assert "categories" in data
 
 
 # ============================================================
-# Tests Debates — Create
+# Tests Debates — Create (avec auth)
 # ============================================================
 
 class TestDebateCreateAPI:
     """Tests de la création de débat via l'API."""
 
     def test_create_debate_returns_id(self, client, mock_all):
-        """POST /api/v1/debates → 200 avec debate_id."""
+        """POST /api/v1/debates avec auth → 200 avec debate_id."""
         from app.services.debate.models import Debate, Participant
 
-        # Mock l'orchestrateur pour retourner un débat valide
         mock_orch = MagicMock()
         debate = Debate(question="Test K8s ?")
         debate.participants = [
@@ -185,13 +200,17 @@ class TestDebateCreateAPI:
         mock_orch.create_debate.return_value = debate
 
         with patch("app.routers.debates.get_orchestrator", return_value=mock_orch):
-            response = client.post("/api/v1/debates", json={
-                "question": "Faut-il migrer vers K8s ?",
-                "participants": [
-                    {"provider": "llmaas", "model": "model-a"},
-                    {"provider": "llmaas", "model": "model-b"},
-                ],
-            })
+            response = client.post(
+                "/api/v1/debates",
+                json={
+                    "question": "Faut-il migrer vers K8s ?",
+                    "participants": [
+                        {"provider": "llmaas", "model": "model-a"},
+                        {"provider": "llmaas", "model": "model-b"},
+                    ],
+                },
+                headers=TEST_AUTH_HEADERS,  # V1-01
+            )
 
         assert response.status_code == 200
         data = response.json()
@@ -204,41 +223,56 @@ class TestDebateCreateAPI:
         """POST avec < 2 participants valides → 400."""
         mock_orch = MagicMock()
         debate = MagicMock()
-        debate.participants = [MagicMock()]  # Seulement 1
+        debate.participants = [MagicMock()]
         mock_orch.create_debate.return_value = debate
 
         with patch("app.routers.debates.get_orchestrator", return_value=mock_orch):
-            response = client.post("/api/v1/debates", json={
-                "question": "Test ?",
-                "participants": [
-                    {"provider": "llmaas", "model": "model-a"},
-                    {"provider": "llmaas", "model": "model-b"},
-                ],
-            })
+            response = client.post(
+                "/api/v1/debates",
+                json={
+                    "question": "Test question minimum ?",
+                    "participants": [
+                        {"provider": "llmaas", "model": "model-a"},
+                        {"provider": "llmaas", "model": "model-b"},
+                    ],
+                },
+                headers=TEST_AUTH_HEADERS,  # V1-01
+            )
 
         assert response.status_code == 400
 
 
 # ============================================================
-# Tests Debates — List & Status
+# Tests Debates — List & Status (avec auth)
 # ============================================================
 
 class TestDebateListAPI:
     """Tests du listing des débats."""
 
     def test_list_empty(self, client):
-        """GET /api/v1/debates → liste vide au démarrage."""
-        # Reset le store
+        """GET /api/v1/debates avec auth → liste vide au démarrage."""
         from app.routers import debates
         debates._active_debates.clear()
 
-        response = client.get("/api/v1/debates")
+        response = client.get("/api/v1/debates", headers=TEST_AUTH_HEADERS)
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 0
         assert data["debates"] == []
 
     def test_get_debate_not_found(self, client):
-        """GET /api/v1/debates/:id non trouvé → 404."""
-        response = client.get("/api/v1/debates/nonexistent")
+        """GET /api/v1/debates/:id non trouvé → 400 (UUID invalide)."""
+        response = client.get(
+            "/api/v1/debates/nonexistent",
+            headers=TEST_AUTH_HEADERS,
+        )
+        # V1-03 : "nonexistent" n'est pas un UUID v4 → 400
+        assert response.status_code == 400
+
+    def test_get_debate_uuid_not_found(self, client):
+        """GET /api/v1/debates/:uuid non trouvé → 404."""
+        response = client.get(
+            "/api/v1/debates/00000000-0000-0000-0000-000000000000",
+            headers=TEST_AUTH_HEADERS,
+        )
         assert response.status_code == 404

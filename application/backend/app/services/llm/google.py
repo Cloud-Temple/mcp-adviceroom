@@ -353,7 +353,7 @@ class GoogleProvider(BaseLLMProvider):
         except Exception as e:
             logger.error(f"✗ Google erreur : {e}")
             return LLMResponse(
-                content=f"Erreur Google Gemini : {str(e)}",
+                content="Erreur temporaire du provider Google Gemini",
                 finish_reason="error",
                 model=model,
                 provider=self.provider_name,
@@ -523,7 +523,7 @@ class GoogleProvider(BaseLLMProvider):
         except Exception as e:
             logger.error(f"✗ Google stream erreur : {e}")
             yield LLMStreamChunk(
-                delta_content=f"Erreur Google streaming : {str(e)}",
+                delta_content="Erreur temporaire du provider Google Gemini (streaming)",
                 finish_reason="error",
                 model=model,
                 provider=self.provider_name,

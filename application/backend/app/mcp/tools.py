@@ -9,13 +9,15 @@ Outils :
 - debate_status     (read)   → Statut d'un débat
 - debate_list       (read)   → Lister les débats
 - provider_list     (read)   → Lister les LLMs disponibles
-- system_health     (—)      → État de santé du service
-- system_about      (—)      → Informations sur le service
+- system_health     (—)      → État de santé du service (public)
+- system_about      (—)      → Informations sur le service (public)
 
 Ref: DESIGN/architecture.md §4.2.5
+Sécurité: DESIGN/SECURITY_AUDIT_V1.md V1-02, V1-03
 """
 import logging
 import platform
+import re
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Optional
 
@@ -24,6 +26,11 @@ from pydantic import Field
 logger = logging.getLogger(__name__)
 
 __all__ = ["register_tools"]
+
+# V1-03 : validation debate_id (UUID v4)
+_DEBATE_ID_RE = re.compile(r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$")
+_MAX_QUESTION_LENGTH = 10_000
+_MAX_ROUNDS = 20
 
 
 # ============================================================
@@ -53,14 +60,14 @@ def register_tools(mcp):
     Appelé depuis main.py après la création de l'instance FastMCP.
     """
 
-    # ── debate_create ────────────────────────────────────
+    # ── debate_create (write) ────────────────────────────
 
     @mcp.tool()
     async def debate_create(
         question: Annotated[str, Field(description="La question à débattre")],
         participants: Annotated[
             List[Dict[str, str]],
-            Field(description='Liste [{\"provider\": \"...\", \"model\": \"...\"}]'),
+            Field(description='Liste [{"provider": "...", "model": "..."}]'),
         ],
         persona_overrides: Annotated[
             Optional[Dict[str, str]],
@@ -68,15 +75,28 @@ def register_tools(mcp):
         ] = None,
         max_rounds: Annotated[
             Optional[int],
-            Field(description="Nombre max de rounds (défaut: 5)"),
+            Field(description="Nombre max de rounds (défaut: 5, max: 20)"),
         ] = None,
     ) -> dict:
         """
         Crée et lance un nouveau débat entre LLMs.
 
+        Requiert un token avec permission 'write' ou 'admin'.
         Le débat est exécuté en tâche de fond. Utilisez debate_status
         pour suivre l'avancement et récupérer le verdict.
         """
+        # V1-02 : auth write requise
+        from ..auth.context import check_write_permission
+        write_err = check_write_permission()
+        if write_err:
+            return write_err
+
+        # V1-03 : validation d'entrée
+        if not question or len(question) > _MAX_QUESTION_LENGTH:
+            return {"status": "error", "message": f"Question requise (max {_MAX_QUESTION_LENGTH} chars)"}
+        if not participants or len(participants) < 2 or len(participants) > 5:
+            return {"status": "error", "message": "2 à 5 participants requis"}
+
         import asyncio
         from ..routers.debates import (
             _active_debates, _debate_events, _debate_events_history,
@@ -85,9 +105,10 @@ def register_tools(mcp):
 
         orchestrator = _get_orchestrator()
 
+        # V1-03 : borner max_rounds
         config_overrides = {}
         if max_rounds:
-            config_overrides["max_rounds"] = max_rounds
+            config_overrides["max_rounds"] = min(max(int(max_rounds), 1), _MAX_ROUNDS)
 
         debate = orchestrator.create_debate(
             question=question,
@@ -115,22 +136,32 @@ def register_tools(mcp):
             "stream_url": f"/api/v1/debates/{debate.id}/stream",
         }
 
-    # ── debate_status ────────────────────────────────────
+    # ── debate_status (read) ─────────────────────────────
 
     @mcp.tool()
     async def debate_status(
-        debate_id: Annotated[str, Field(description="ID du débat")],
+        debate_id: Annotated[str, Field(description="ID du débat (UUID)")],
     ) -> dict:
         """
         Retourne le statut actuel d'un débat.
 
+        Requiert un token avec permission 'read' ou 'admin'.
         Inclut statut, phase, participants, rounds, et verdict si terminé.
         """
+        # V1-02 : auth read requise
+        from ..auth.context import check_access
+        access_err = check_access(debate_id)
+        if access_err:
+            return access_err
+
+        # V1-03 : validation debate_id
+        if not _DEBATE_ID_RE.match(debate_id):
+            return {"status": "error", "message": "debate_id invalide (UUID v4 attendu)"}
+
         debates = _get_debate_store()
         debate = debates.get(debate_id)
 
         if not debate:
-            # Chercher sur S3
             from ..services.storage.s3_store import get_debate_store
             store = get_debate_store()
             if store and store.available:
@@ -142,11 +173,21 @@ def register_tools(mcp):
         from ..services.storage.serializer import serialize_debate_full
         return {"status": "ok", **serialize_debate_full(debate)}
 
-    # ── debate_list ──────────────────────────────────────
+    # ── debate_list (read) ───────────────────────────────
 
     @mcp.tool()
     async def debate_list() -> dict:
-        """Liste tous les débats connus (mémoire + S3)."""
+        """
+        Liste tous les débats connus (mémoire + S3).
+
+        Requiert un token avec permission 'read' ou 'admin'.
+        """
+        # V1-02 : auth read requise
+        from ..auth.context import check_access
+        access_err = check_access("debates")
+        if access_err:
+            return access_err
+
         debates = _get_debate_store()
 
         items = [
@@ -161,7 +202,6 @@ def register_tools(mcp):
             for d in debates.values()
         ]
 
-        # Ajouter les débats S3
         try:
             from ..services.storage.s3_store import get_debate_store
             store = get_debate_store()
@@ -179,22 +219,33 @@ def register_tools(mcp):
 
         return {"status": "ok", "debates": items, "total": len(items)}
 
-    # ── provider_list ────────────────────────────────────
+    # ── provider_list (read) ─────────────────────────────
 
     @mcp.tool()
     async def provider_list() -> dict:
-        """Liste les LLMs disponibles pour les débats."""
+        """
+        Liste les LLMs disponibles pour les débats.
+
+        Requiert un token avec permission 'read' ou 'admin'.
+        """
+        # V1-02 : auth read requise
+        from ..auth.context import check_access
+        access_err = check_access("providers")
+        if access_err:
+            return access_err
+
         from ..services.llm.router import get_llm_router
         router = get_llm_router()
         return {"status": "ok", **router.list_providers()}
 
-    # ── system_health ────────────────────────────────────
+    # ── system_health (public) ───────────────────────────
 
     @mcp.tool()
     async def system_health() -> dict:
         """
         Vérifie l'état de santé du service AdviceRoom.
 
+        Cet outil est public (pas d'authentification requise).
         Teste la connectivité S3 et les providers LLM.
         """
         results = {}
@@ -207,8 +258,8 @@ def register_tools(mcp):
                 results["s3"] = store.test_connectivity()
             else:
                 results["s3"] = {"status": "not_configured"}
-        except Exception as e:
-            results["s3"] = {"status": "error", "message": str(e)}
+        except Exception:
+            results["s3"] = {"status": "error", "message": "Erreur de connectivité S3"}
 
         # LLM Router
         try:
@@ -222,8 +273,8 @@ def register_tools(mcp):
                     for c in providers.get("categories", {}).values()
                 ),
             }
-        except Exception as e:
-            results["llm_router"] = {"status": "error", "message": str(e)}
+        except Exception:
+            results["llm_router"] = {"status": "error", "message": "Erreur LLM Router"}
 
         all_ok = all(r.get("status") == "ok" for r in results.values())
 
@@ -233,11 +284,15 @@ def register_tools(mcp):
             "services": results,
         }
 
-    # ── system_about ─────────────────────────────────────
+    # ── system_about (public) ────────────────────────────
 
     @mcp.tool()
     async def system_about() -> dict:
-        """Informations sur le service AdviceRoom."""
+        """
+        Informations sur le service AdviceRoom.
+
+        Cet outil est public (pas d'authentification requise).
+        """
         version = "dev"
         vf = Path(__file__).parent.parent.parent / "VERSION"
         if vf.exists():

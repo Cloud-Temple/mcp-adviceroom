@@ -8,12 +8,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Dépendances Python
+# V1-15 : requirements.lock disponible pour la prod (pip-compile --generate-hashes)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Version et code source
 COPY VERSION ./VERSION
 COPY app/ ./app/
+
+# V1-14 : utilisateur non-root
+RUN adduser --disabled-password --gecos '' --uid 1001 appuser
+USER appuser
 
 # Port
 EXPOSE 8000

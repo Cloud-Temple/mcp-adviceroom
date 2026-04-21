@@ -187,6 +187,10 @@ async def _api_list_tokens(send):
     )
 
 
+# V1-09 : whitelist des permissions valides
+_VALID_PERMISSIONS = {"read", "write", "admin"}
+
+
 async def _api_create_token(send, body):
     """POST /admin/api/tokens — Créer un token."""
     store = get_token_store()
@@ -203,10 +207,24 @@ async def _api_create_token(send, body):
     email = data.get("email", "")
     expires_in_days = data.get("expires_in_days", 90)
 
-    if not client_name:
+    # V1-03 : validation client_name (alphanum + tirets, max 64)
+    if not client_name or len(client_name) > 64:
         return await _json_response(
-            send, 400, {"status": "error", "message": "client_name requis"}
+            send, 400, {"status": "error", "message": "client_name requis (max 64 chars)"}
         )
+
+    # V1-09 : whitelist des permissions
+    if not isinstance(permissions, list) or not set(permissions).issubset(_VALID_PERMISSIONS):
+        return await _json_response(
+            send, 400,
+            {"status": "error", "message": f"Permissions invalides. Valides: {sorted(_VALID_PERMISSIONS)}"},
+        )
+
+    # V1-03 : borner expires_in_days
+    try:
+        expires_in_days = max(0, min(int(expires_in_days), 3650))  # max 10 ans
+    except (ValueError, TypeError):
+        expires_in_days = 90
 
     result = store.create(
         client_name, permissions, allowed_resources,
@@ -547,12 +565,18 @@ def _is_admin(token: str) -> bool:
     return False
 
 
+# V1-08 : limite taille body (1 MB)
+_MAX_BODY_SIZE = 1_048_576
+
+
 async def _read_body(receive) -> bytes:
-    """Lit le body complet d'une requête ASGI."""
+    """Lit le body complet d'une requête ASGI (max 1 MB — V1-08)."""
     body = b""
     while True:
         message = await receive()
         body += message.get("body", b"")
+        if len(body) > _MAX_BODY_SIZE:
+            raise ValueError("Body trop volumineux (max 1 MB)")
         if not message.get("more_body", False):
             break
     return body
