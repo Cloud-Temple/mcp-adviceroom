@@ -1,7 +1,7 @@
 # AdviceRoom — Architecture Document v1.0
 
 > **Date** : 17 avril 2026 (mis à jour 22 avril 2026)
-> **Auteur** : Christophe Lesur / Agent Cline
+> **Auteur** : Christophe Lesur 
 > **Licence** : Apache 2.0, open-source
 > **Statut** : v1.1 — validé et vérifié
 

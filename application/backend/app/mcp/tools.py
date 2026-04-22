@@ -29,7 +29,7 @@ __all__ = ["register_tools"]
 
 # V1-03 : validation debate_id (UUID v4)
 _DEBATE_ID_RE = re.compile(r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$")
-_MAX_QUESTION_LENGTH = 10_000
+_MAX_QUESTION_LENGTH = 50_000
 _MAX_ROUNDS = 20
 
 

@@ -3,8 +3,8 @@
 > Structured debates between heterogeneous LLMs — MCP Server + Web Application
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-127%2F127-brightgreen)]()
-[![Version](https://img.shields.io/badge/Version-0.1.0-blue)]()
+[![Tests](https://img.shields.io/badge/Tests-135%2F135-brightgreen)]()
+[![Version](https://img.shields.io/badge/Version-0.1.1-blue)]()
 
 [🇫🇷 Version française](README.md)
 
@@ -28,8 +28,9 @@ AdviceRoom orchestrates **structured debates between heterogeneous LLMs**. Users
 | 🧑‍💬 | **User-in-the-loop**    | LLMs can ask questions to the user mid-debate                |
 | 🔧     | **LLM tools**           | web_search, calculator, datetime via MCP Tools               |
 | 🎭     | **Personas**            | 5 roles (Pragmatic, Devil's advocate, Risk analyst…)         |
+| 🔀     | **3 debate modes**      | Standard (Within-Round), Parallel (Cross-Round, default), Blitz (~1 min) |
 | 📊     | **Admin dashboard**     | Live monitoring, confidence/stability charts, HTML export    |
-| 🔒     | **Security**            | Bearer auth, WAF Caddy+Coraza, V1 audit (22/22 findings)     |
+| 🔒     | **Security**            | Bearer auth, WAF Caddy+Coraza, V1.1 audit (19/22 fixed)      |
 
 ## Architecture
 
@@ -94,6 +95,14 @@ Phase 3: VERDICT (dedicated synthesizer LLM)
   Produces: consensus | partial_consensus | dissensus [6]
   + agreement/divergence points + recommendation + confidence
 ```
+
+### 3 debate modes [[4]](#references)
+
+| Mode | Protocol | Visibility | Typical duration | Use case |
+|------|----------|------------|-----------------|----------|
+| ⚙️ **standard** | Within-Round (WR) | Each agent sees turns **from the same round** | 15-25 min | Maximum interaction, peer-referencing |
+| 🔄 **parallel** *(default)* | Cross-Round (CR) | Agents only see **previous rounds** | 3-8 min | Speed/quality trade-off (3× faster) |
+| ⚡ **blitz** | No-Interaction + 1 round | Parallel opening + 1 cross-reaction round | 1-2 min | Quick answer, initial exploration |
 
 ### References
 
@@ -178,18 +187,17 @@ python scripts/adviceroom_cli.py shell           # Interactive shell
 
 ## Security
 
-- **Full V1 audit**: 22 findings identified, 22 addressed ([report](DESIGN/SECURITY_AUDIT_V1.md))
+- **V1.1 audit**: 22 findings identified, 19 fixed, 2 minor partials, 0 open ([report](DESIGN/SECURITY_AUDIT_V1.md))
 - **Auth**: Bearer Token + ContextVar on all REST and MCP routes
 - **Validation**: UUID regex, length limits, bounds, whitelists
-- **Infra**: Non-root Dockerfile, internal ports only, HSTS, security headers
-- **WAF**: Caddy compiled with Coraza (OWASP CRS ready)
+- **Infra**: Non-root Dockerfile (UID 1001), internal ports only, HSTS, security headers
+- **WAF**: Caddy + Coraza enabled (OWASP CRS v4.8.0, `SecRuleEngine On`)
 - **Supply chain**: fastmcp≥3.2.0 (4 CVEs fixed), requirements.lock available
 
 ## Documentation
 
-- [Architecture v1.0](DESIGN/architecture.md) — Reference document (17 sections)
-- [Security Audit V1](DESIGN/SECURITY_AUDIT_V1.md) — Full report (22 findings)
-- [Audit Methodology](DESIGN/SECURITY_AUDIT_METHODOLOGY.md) — 5-phase framework
+- [Architecture v1.1](DESIGN/architecture.md) — Reference document (17 sections)
+- [Security Audit V1.1](DESIGN/SECURITY_AUDIT_V1.md) — Full report (22 findings, 19 fixed)
 - [Research Papers](DESIGN/research/README.md) — 9 foundational papers
 
 ## Project Structure
@@ -206,7 +214,7 @@ mcp-adviceroom/
 │   │   │   ├── routers/   # REST API (debates, providers)
 │   │   │   ├── services/  # Debate engine, LLM providers, S3 storage, MCP Tools
 │   │   │   └── static/    # Admin SPA (admin.html)
-│   │   └── tests/         # 127 tests (pytest)
+│   │   └── tests/         # 135 tests (pytest)
 │   └── frontend/          # React 18 + Vite + Tailwind
 ├── scripts/
 │   ├── adviceroom_cli.py  # CLI entry point

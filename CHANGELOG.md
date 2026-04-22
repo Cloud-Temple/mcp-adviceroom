@@ -5,6 +5,19 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [0.1.1] — 2026-04-22
+
+### Corrigé
+
+- **Limite question** : augmentée de 10 000 à 50 000 caractères (`debates.py` + `tools.py`) — permet les questions longues (documents, contexte riche)
+
+### Documentation
+
+- **README FR/EN** : badge tests 127→135, ajout section "3 modes de débat", architecture v1.1, WAF Coraza activé, suppression lien cassé SECURITY_AUDIT_METHODOLOGY.md
+- **CHANGELOG** : ajout des 3 modes de débat et améliorations UI/CLI dans les sections manquantes
+
+---
+
 ## [0.1.0] — 2026-04-22
 
 Première version fonctionnelle complète du moteur de débat multi-LLM.
@@ -106,6 +119,21 @@ Première version fonctionnelle complète du moteur de débat multi-LLM.
 - **V1-12** : str(e) → messages génériques dans **12 fichiers** (providers, executor, verdict, s3_store, orchestrator)
 - Suppression de toutes les fuites d'informations internes (`str(e)`) dans les réponses API
 - Audit sécurité complet : SECURITY_AUDIT_V1.md mis à jour (révision V1.1)
+
+### Ajouté (22/04)
+
+#### 3 modes de débat — basés sur [4] Debate Protocols
+- **standard** (Within-Round) : round-robin séquentiel, same-round visibility, interaction maximale (15-25 min)
+- **parallel** (Cross-Round, **défaut**) : `asyncio.gather` par round, 3× plus rapide (3-8 min)
+- **blitz** (NI + 1 round) : opening parallèle + 1 round de réaction croisée (~1-2 min)
+- 13 fichiers modifiés : orchestrator, context_builder, debate.yaml, models, debates.py, tools.py, serializer, admin API/HTML, CLI
+- +8 tests modes E2E (135 total)
+
+#### Améliorations UI et CLI
+- **Admin HTML** : badge mode coloré (⚡ blitz rouge, 🔄 parallel bleu, ⚙️ standard orange) dans header et liste débats
+- **Admin HTML** : tooltips <?> expliquant les 3 modes, durée formatée mm:ss (plus de secondes brutes)
+- **Admin HTML** : export HTML enrichi avec mode et durée formatée
+- **CLI display** : colonnes Mode (avec icône) et Durée (Xmin Ys) dans `debate list` et `debate get`
 
 ### Conformité recherche (22/04) — audit 9 papiers vs code
 

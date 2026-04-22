@@ -50,7 +50,7 @@ router = APIRouter()
 
 # UUID v4 : 8-4-4-4-12 hex chars avec tirets
 _DEBATE_ID_RE = re.compile(r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$")
-_MAX_QUESTION_LENGTH = 10_000
+_MAX_QUESTION_LENGTH = 50_000
 _MAX_ANSWER_LENGTH = 10_000
 _MAX_ROUNDS = 20
 
