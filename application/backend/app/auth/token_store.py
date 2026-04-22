@@ -73,16 +73,24 @@ class TokenStore:
         self._s3_client = None
 
     def _get_s3(self):
-        """Lazy-load du client S3 boto3."""
+        """Lazy-load du client S3 boto3 (config Dell ECS compatible)."""
         if self._s3_client is None:
             import boto3
+            from botocore.config import Config as BotoConfig
 
+            # Dell ECS requiert SigV2 ou payload_signing_enabled=False
+            # (sinon XAmzContentSHA256Mismatch sur PutObject)
+            config = BotoConfig(
+                signature_version="s3",  # SigV2 legacy — compatible Dell ECS
+                s3={"addressing_style": "path"},
+            )
             self._s3_client = boto3.client(
                 "s3",
                 endpoint_url=self.settings.s3_endpoint,
                 aws_access_key_id=self.settings.s3_access_key,
                 aws_secret_access_key=self.settings.s3_secret_key,
                 region_name=self.settings.s3_region,
+                config=config,
             )
         return self._s3_client
 
@@ -150,7 +158,12 @@ class TokenStore:
         expires_in_days: int = 90,
         email: str = "",
     ) -> dict:
-        """Crée un nouveau token et le sauvegarde sur S3."""
+        """Crée un nouveau token et le sauvegarde sur S3.
+
+        Read-modify-write : recharge TOUJOURS depuis S3 avant d'ajouter
+        pour éviter d'écraser les tokens existants (race condition ou cache périmé).
+        """
+        self.load()  # Force refresh S3 → mémoire avant écriture
         import secrets
         from datetime import datetime, timezone, timedelta
 
@@ -194,9 +207,13 @@ class TokenStore:
         ]
 
     def revoke(self, hash_prefix: str) -> bool:
-        """Révoque un token par préfixe de hash (≥8 caractères requis)."""
+        """Révoque un token par préfixe de hash (≥8 caractères requis).
+
+        Read-modify-write : recharge depuis S3 avant modification.
+        """
         if len(hash_prefix) < 8:
             return False
+        self.load()  # Force refresh S3 → mémoire avant écriture
         for h, t in self._tokens.items():
             if h.startswith(hash_prefix):
                 t["revoked"] = True
