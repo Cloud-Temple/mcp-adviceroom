@@ -97,11 +97,24 @@ Première version fonctionnelle complète du moteur de débat multi-LLM.
 - **V1-07** [ÉLEVÉ] : WAF Coraza compilé (xcaddy + coraza-caddy/v2)
 - **V1-08** : Body limit 1 MB admin API
 - **V1-09** : Whitelist permissions {read, write, admin}
-- **V1-12** : str(e) → messages génériques (4 providers LLM)
 - **V1-14** : Dockerfile USER non-root (appuser, UID 1001)
 - **V1-15** : requirements.lock généré (1246 lignes, SHA256 hashes)
-- **V1-16** : HSTS 2 ans + preload + security headers
 - **V1-17** : Port frontend fermé (expose only)
+
+#### Audit V1.1 — passe de vérification (22/04) — 19 ✅, 2 ⚠️, 0 ❌
+- **V1-07** : WAF Coraza **ACTIVÉ** dans le Caddyfile (directive `coraza_waf` + OWASP CRS v4.8.0 + `SecRuleEngine On`)
+- **V1-12** : str(e) → messages génériques dans **12 fichiers** (providers, executor, verdict, s3_store, orchestrator)
+- Suppression de toutes les fuites d'informations internes (`str(e)`) dans les réponses API
+- Audit sécurité complet : SECURITY_AUDIT_V1.md mis à jour (révision V1.1)
+
+### Conformité recherche (22/04) — audit 9 papiers vs code
+
+#### Correction critique : protocoles de débat [4]
+- **Mode standard = Within-Round (WR)** : implémenté la vraie same-round visibility — chaque agent voit les turns déjà complétés dans le même round (`context_builder.py` + `orchestrator.py`)
+- **Mode parallel = Cross-Round (CR)** : labels corrigés (c'était inversé dans l'architecture)
+- **Mode blitz = NI + 1 round** : inchangé, conforme
+- `debate.yaml` : commentaires corrigés (WR/CR)
+- `architecture.md` : §3.1.1 mis à jour (v1.1), labels et descriptions WR/CR corrigés
 
 ### Nettoyé
 - Supprimé starter-kit/ (boilerplate plus nécessaire)

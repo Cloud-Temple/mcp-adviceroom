@@ -277,10 +277,18 @@ def debate_delete_cmd(ctx, debate_id, output_json):
 @debate_group.command("start")
 @click.argument("question")
 @click.option("--models", "-m", default="", help="IDs des modèles séparés par des virgules")
-@click.option("--rounds", "-r", default=5, type=int, help="Nombre max de rounds (défaut: 5)")
+@click.option("--mode", default=None, type=click.Choice(["standard", "parallel", "blitz"]),
+              help="Mode de débat : standard (~15min) | parallel (~5min) | blitz (~1min)")
+@click.option("--rounds", "-r", default=5, type=int, help="Nombre max de rounds (défaut: selon mode)")
 @click.pass_context
-def debate_start_cmd(ctx, question, models, rounds):
-    """Lancer un débat avec streaming temps réel."""
+def debate_start_cmd(ctx, question, models, mode, rounds):
+    """Lancer un débat avec streaming temps réel.
+
+    Modes disponibles (§3.1.1) :
+      standard  — Round-robin séquentiel, max interaction (~15-25 min)
+      parallel  — Turns parallèles, bon compromis (~3-8 min) [DÉFAUT]
+      blitz     — Opening + verdict direct, exploration rapide (~1-2 min)
+    """
     async def _run():
         client = AdminClient(ctx.obj["url"], ctx.obj["token"])
 
@@ -331,6 +339,8 @@ def debate_start_cmd(ctx, question, models, rounds):
 
         # 2. Header
         from .display import _style_for
+        mode_display = mode or "parallel"
+        mode_icons = {"standard": "⚙️", "parallel": "🔄", "blitz": "⚡"}
         console.print()
         from rich.panel import Panel
         console.print(Panel(
@@ -338,6 +348,7 @@ def debate_start_cmd(ctx, question, models, rounds):
             style="cyan", padding=(0, 2),
         ))
         console.print(f"  [bold]Question :[/] {question}")
+        console.print(f"  [bold]Mode :[/] {mode_icons.get(mode_display, '')} {mode_display}")
         console.print(f"  [bold]Participants :[/]")
         for mid in model_ids:
             info = model_registry.get(mid, {})
@@ -350,7 +361,7 @@ def debate_start_cmd(ctx, question, models, rounds):
 
         # 3. Créer le débat
         console.print("  [dim]Création du débat...[/]")
-        result = await client.create_debate(question, participants)
+        result = await client.create_debate(question, participants, mode=mode)
         if result.get("status") == "error":
             show_error(result.get("message", "Erreur création"))
             return

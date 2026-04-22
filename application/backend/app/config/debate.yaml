@@ -1,17 +1,47 @@
 # ============================================================
 # AdviceRoom — Paramètres du protocole de débat
 # ============================================================
-# Ref: DESIGN/architecture.md §12.4
+# Ref: DESIGN/architecture.md §3.1.1, §12.4, §13, §14, §15
+
+# --- Modes de débat (§3.1.1) ---
+# Sélectionnés à la création du débat via le paramètre "mode".
+# Fondés sur les papiers [2] Free-MAD, [4] Debate Protocols, [5] Can LLM Debate.
+modes:
+  standard:
+    # Within-Round [4] : round-robin séquentiel, same-round visibility, max interaction
+    parallel_turns: false         # Turns séquentiels — chaque agent voit les turns précédents du même round
+    max_rounds: 5                 # Max rounds de débat (Phase 2)
+    min_rounds: 1                 # Min rounds avant arrêt adaptatif
+    tools_enabled: true           # Outils disponibles pendant le débat
+    max_response_tokens: ~        # Pas de limite de concision
+    description: "Débat approfondi avec interaction maximale entre participants"
+  parallel:
+    # Cross-Round [4] : tous en parallèle, chaque agent voit seulement le round précédent
+    parallel_turns: true          # Tous les participants parlent en même temps (pas de same-round visibility)
+    max_rounds: 3                 # Moins de rounds (chacun est plus rapide)
+    min_rounds: 1                 # Arrêt dès que stable
+    tools_enabled: true           # Outils disponibles
+    max_response_tokens: ~        # Pas de limite de concision
+    description: "Bon compromis vitesse/profondeur, turns parallèles"
+  blitz:
+    # Single-round [2] Free-MAD : 1 round parallèle améliore vs 0 (No-Interaction [4])
+    parallel_turns: true          # Turns parallèles
+    max_rounds: 1                 # 1 seul round de réaction croisée [2]
+    min_rounds: 0                 # Peut s'arrêter si stable
+    tools_enabled: false          # Pas d'outils (vitesse max)
+    max_response_tokens: 500      # Concision forcée (bullet points)
+    description: "Exploration rapide : opening + 1 round réaction + verdict (~2 min)"
+
+# Mode par défaut (si non spécifié à la création)
+default_mode: "parallel"
 
 # Limites du débat
 limits:
   max_participants: 5             # Max LLMs invités (hors synthétiseur)
-  max_rounds: 5                   # Max rounds de débat (Phase 2)
-  min_rounds: 2                   # Min rounds avant arrêt adaptatif
 
 # Détection de stabilité (§13)
 stability:
-  threshold: 0.85                 # Score minimum pour considérer le débat stable
+  threshold: 0.75                 # Score minimum pour considérer le débat stable (assoupli pour arrêt plus rapide)
   weights:
     position_delta: 0.5           # Poids du changement de position
     confidence_delta: 0.3         # Poids de la variation de confidence

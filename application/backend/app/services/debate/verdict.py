@@ -173,7 +173,7 @@ class VerdictSynthesizer:
 
         except Exception as e:
             logger.error(f"✗ Erreur synthétiseur ({model_id}): {e}")
-            return self._error_verdict(str(e))
+            return self._error_verdict("Erreur temporaire du synthétiseur de verdict")
 
     # ─── Parsing de la réponse ───────────────────────────────
 

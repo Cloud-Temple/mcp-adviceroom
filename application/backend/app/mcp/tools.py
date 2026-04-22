@@ -73,9 +73,13 @@ def register_tools(mcp):
             Optional[Dict[str, str]],
             Field(description="Overrides de personas {model_id: persona_id}"),
         ] = None,
+        mode: Annotated[
+            Optional[str],
+            Field(description="Mode de débat : standard | parallel | blitz (défaut: parallel)"),
+        ] = None,
         max_rounds: Annotated[
             Optional[int],
-            Field(description="Nombre max de rounds (défaut: 5, max: 20)"),
+            Field(description="Nombre max de rounds (défaut: selon mode, max: 20)"),
         ] = None,
     ) -> dict:
         """
@@ -84,6 +88,11 @@ def register_tools(mcp):
         Requiert un token avec permission 'write' ou 'admin'.
         Le débat est exécuté en tâche de fond. Utilisez debate_status
         pour suivre l'avancement et récupérer le verdict.
+
+        Modes disponibles (§3.1.1) :
+        - standard : round-robin séquentiel, ~15-25 min, max interaction
+        - parallel (défaut) : turns parallèles, ~3-8 min, bon compromis
+        - blitz : opening + verdict direct, ~1-2 min, exploration rapide
         """
         # V1-02 : auth write requise
         from ..auth.context import check_write_permission
@@ -96,6 +105,8 @@ def register_tools(mcp):
             return {"status": "error", "message": f"Question requise (max {_MAX_QUESTION_LENGTH} chars)"}
         if not participants or len(participants) < 2 or len(participants) > 5:
             return {"status": "error", "message": "2 à 5 participants requis"}
+        if mode and mode not in ("standard", "parallel", "blitz"):
+            return {"status": "error", "message": "Mode invalide. Valeurs: standard, parallel, blitz"}
 
         import asyncio
         from ..routers.debates import (
@@ -115,6 +126,7 @@ def register_tools(mcp):
             participant_specs=participants,
             persona_overrides=persona_overrides,
             config_overrides=config_overrides or None,
+            mode=mode,
         )
 
         if len(debate.participants) < 2:

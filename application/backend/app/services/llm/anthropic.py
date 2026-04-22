@@ -574,7 +574,8 @@ class AnthropicProvider(BaseLLMProvider):
                 else:
                     return {"status": "ok", "details": f"HTTP {response.status_code}"}
         except Exception as e:
-            return {"status": "error", "details": str(e)}
+            logger.error(f"✗ Erreur connectivité Anthropic: {e}")
+            return {"status": "error", "details": "Erreur de connectivité Anthropic"}
 
     def get_capabilities(self) -> Dict[str, bool]:
         """Capabilities du provider Anthropic."""

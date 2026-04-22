@@ -280,14 +280,62 @@ class TestContextWindow:
         context = builder._format_debate_context(debate, "llm-a", current_round=6)
         assert "Positions initiales" in context
 
-    def test_current_round_not_included(self, mock_context_config):
-        """Le round en cours n'est pas inclus dans le contexte."""
+    def test_current_round_not_included_cr_mode(self, mock_context_config):
+        """En mode Cross-Round (parallel), le round en cours n'est pas dans le contexte."""
         builder = ContextBuilder()
         debate = make_debate_with_rounds(3)
 
-        # On est au round 3 → round 3 ne doit PAS être dans le contexte
+        # Mode CR (pas de current_round_turns) → round 3 NE doit PAS être visible
         context = builder._format_debate_context(debate, "llm-a", current_round=3)
         assert "Position A round 3" not in context
+
+    def test_current_round_included_wr_mode(self, mock_context_config):
+        """En mode Within-Round (standard), les turns du round en cours sont visibles."""
+        builder = ContextBuilder()
+        debate = make_debate_with_rounds(2)
+
+        # Simuler : on est au round 3, llm-a a déjà parlé, c'est le tour de llm-b
+        wr_turns = [
+            make_turn("llm-a", 3, thesis="Position WR de A", confidence=85,
+                      challenged="llm-b", challenge_reason="Argument faible"),
+        ]
+
+        # Mode WR (current_round_turns fourni) → les turns du round en cours DOIVENT être visibles
+        context = builder._format_debate_context(
+            debate, "llm-b", current_round=3, current_round_turns=wr_turns
+        )
+        assert "Position WR de A" in context
+        assert "Round 3 (en cours)" in context
+
+    def test_wr_turns_not_included_when_empty(self, mock_context_config):
+        """Si current_round_turns est vide, pas de section 'en cours'."""
+        builder = ContextBuilder()
+        debate = make_debate_with_rounds(2)
+
+        # Premier participant du round → pas encore de turns complétés
+        context = builder._format_debate_context(
+            debate, "llm-a", current_round=3, current_round_turns=[]
+        )
+        assert "en cours" not in context
+
+    def test_wr_turns_passed_through_build_debate_messages(self, mock_context_config):
+        """build_debate_messages propage current_round_turns au contexte."""
+        builder = ContextBuilder()
+        participant = make_participant("llm-b")
+        participant.persona_name = "Test"
+        participant.persona_description = "Desc"
+        debate = make_debate_with_rounds(1)
+
+        wr_turns = [
+            make_turn("llm-a", 2, thesis="Position WR propagée", confidence=90),
+        ]
+
+        messages = builder.build_debate_messages(
+            participant, "Question ?", debate, round_number=2,
+            current_round_turns=wr_turns,
+        )
+        system = messages[0]["content"]
+        assert "Position WR propagée" in system
 
 
 # ============================================================

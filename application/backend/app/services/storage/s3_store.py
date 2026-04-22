@@ -294,4 +294,5 @@ class S3DebateStore:
             self._client_meta.head_bucket(Bucket=self._bucket)
             return {"status": "ok", "bucket": self._bucket}
         except ClientError as e:
-            return {"status": "error", "details": str(e)}
+            logger.error(f"✗ Erreur connectivité S3: {e}")
+            return {"status": "error", "details": "Erreur de connectivité S3"}

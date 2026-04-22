@@ -231,7 +231,8 @@ class OpenAIProvider(BaseLLMProvider):
                 models = [m.get("id", "?") for m in data.get("data", [])]
                 return {"status": "ok", "models_count": len(models)}
         except Exception as e:
-            return {"status": "error", "details": str(e)}
+            logger.error(f"✗ Erreur connectivité OpenAI: {e}")
+            return {"status": "error", "details": "Erreur de connectivité OpenAI"}
 
     def get_capabilities(self) -> Dict[str, bool]:
         """Capabilities du provider OpenAI."""

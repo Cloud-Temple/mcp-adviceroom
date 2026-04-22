@@ -101,6 +101,7 @@ class ContextBuilder:
         question: str,
         debate: Debate,
         round_number: int,
+        current_round_turns: Optional[List[Turn]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Construit les messages pour un round de débat.
@@ -108,6 +109,7 @@ class ContextBuilder:
         Le contexte inclut :
         - System prompt avec persona et règles du round
         - Historique : positions opening + rounds précédents
+        - Turns du round en cours (Within-Round [4] — mode standard seulement)
         - Gestion du context window (résumés pour rounds anciens)
 
         Args:
@@ -115,13 +117,15 @@ class ContextBuilder:
             question: La question originale.
             debate: L'objet Debate complet (opening, rounds, user_answers).
             round_number: Numéro du round actuel (1-based).
+            current_round_turns: Turns déjà complétés dans le round en cours
+                (mode standard/Within-Round [4]). None en mode parallel/Cross-Round.
 
         Returns:
             Messages au format OpenAI : [system, user].
         """
         # Formater les positions précédentes (tous les autres participants)
         formatted_positions = self._format_debate_context(
-            debate, participant.id, round_number
+            debate, participant.id, round_number, current_round_turns
         )
 
         # Formater les réponses utilisateur (si applicable)
@@ -241,6 +245,7 @@ class ContextBuilder:
         debate: Debate,
         current_participant_id: str,
         current_round: int,
+        current_round_turns: Optional[List[Turn]] = None,
     ) -> str:
         """
         Formate le contexte complet du débat pour un participant.
@@ -249,11 +254,21 @@ class ContextBuilder:
         - Opening : toujours inclus (résumé si trop long)
         - Rounds récents (N, N-1) : en entier (zone glissante)
         - Rounds anciens : résumés (zone résumée)
+        - Turns du round en cours (Within-Round [4] — mode standard)
+
+        Within-Round vs Cross-Round (papier [4]) :
+        - Mode standard (WR) : current_round_turns contient les turns déjà
+          complétés dans le round courant → l'agent voit ce que les agents
+          précédents ont dit dans le MÊME round (plus de peer-referencing)
+        - Mode parallel (CR) : current_round_turns est None → l'agent ne
+          voit que les rounds précédents (tous parlent en même temps)
 
         Args:
             debate: L'objet Debate complet.
             current_participant_id: ID du participant qui va parler.
             current_round: Numéro du round actuel.
+            current_round_turns: Turns déjà complétés dans le round en cours
+                (mode standard/WR). None en mode parallel/CR.
 
         Returns:
             Texte formaté avec toutes les positions.
@@ -279,6 +294,31 @@ class ContextBuilder:
                 # Zone résumée : rounds anciens
                 sections.append(f"\n### Round {rnd.number} (résumé)")
                 sections.append(self._summarize_round(rnd))
+
+        # 3. Turns du round EN COURS (Within-Round [4] — mode standard)
+        # En mode séquentiel, les agents qui ont déjà parlé dans ce round
+        # sont visibles par les agents suivants → peer-referencing accru
+        if current_round_turns:
+            sections.append(f"\n### Round {current_round} (en cours)")
+            for turn in current_round_turns:
+                pos = turn.structured_position
+                if pos:
+                    args_str = ', '.join(str(a) for a in pos.arguments[:4])
+                    sections.append(
+                        f"**{turn.participant_id}** :\n"
+                        f"- Thèse : {pos.thesis}\n"
+                        f"- Confidence : {pos.confidence}/100\n"
+                        f"- Arguments : {args_str}"
+                    )
+                    if pos.challenged:
+                        sections.append(
+                            f"- Challenge → {pos.challenged} : "
+                            f"{pos.challenge_reason or 'non détaillé'}"
+                        )
+                elif turn.content:
+                    sections.append(
+                        f"**{turn.participant_id}** : {turn.content[:500]}"
+                    )
 
         return "\n".join(sections)
 

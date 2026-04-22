@@ -546,7 +546,8 @@ class GoogleProvider(BaseLLMProvider):
                 models = [m.get("name", "?") for m in data.get("models", [])]
                 return {"status": "ok", "models_count": len(models)}
         except Exception as e:
-            return {"status": "error", "details": str(e)}
+            logger.error(f"✗ Erreur connectivité Google: {e}")
+            return {"status": "error", "details": "Erreur de connectivité Google Gemini"}
 
     def get_capabilities(self) -> Dict[str, bool]:
         return {

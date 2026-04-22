@@ -88,12 +88,20 @@ class AdminClient:
         """GET /api/v1/providers — liste modèles (API publique)."""
         return await self._get("/api/v1/providers")
 
-    async def create_debate(self, question: str, participants: list) -> dict:
+    async def create_debate(
+        self, question: str, participants: list,
+        mode: str = None, max_rounds: int = None,
+    ) -> dict:
         """POST /api/v1/debates — créer un débat."""
-        return await self._post("/api/v1/debates", {
+        body = {
             "question": question,
             "participants": participants,
-        })
+        }
+        if mode:
+            body["mode"] = mode
+        if max_rounds:
+            body["config"] = {"max_rounds": max_rounds}
+        return await self._post("/api/v1/debates", body)
 
     async def stream_debate(self, stream_url: str):
         """

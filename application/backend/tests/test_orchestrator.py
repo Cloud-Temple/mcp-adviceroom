@@ -30,16 +30,31 @@ from app.services.llm.base import LLMResponse, ModelConfig
 # ============================================================
 
 MOCK_DEBATE_CONFIG = {
-    "limits": {"max_participants": 5, "max_rounds": 3, "min_rounds": 2},
+    "default_mode": "parallel",
+    "modes": {
+        "standard": {
+            "parallel_turns": False, "max_rounds": 3, "min_rounds": 1,
+            "tools_enabled": True, "max_response_tokens": None,
+        },
+        "parallel": {
+            "parallel_turns": True, "max_rounds": 3, "min_rounds": 1,
+            "tools_enabled": True, "max_response_tokens": None,
+        },
+        "blitz": {
+            "parallel_turns": True, "max_rounds": 1, "min_rounds": 0,
+            "tools_enabled": False, "max_response_tokens": 500,
+        },
+    },
+    "limits": {"max_participants": 5},
     "stability": {
-        "threshold": 0.85,
+        "threshold": 0.75,
         "weights": {"position_delta": 0.5, "confidence_delta": 0.3, "argument_novelty": 0.2},
         "confidence_instability_threshold": 30,
     },
     "anti_conformity": {"challenge_min_length": 20, "max_retries": 1},
     "error_handling": {
         "provider_timeout_seconds": 10, "skip_threshold": 3,
-        "min_active_participants": 2,
+        "min_active_participants": 2, "provider_max_retries": 1,
     },
     "synthesizer": {"default_model": "claude-opus-46", "fallback_model": "gpt-52"},
     "context": {"sliding_window_rounds": 2, "summary_tokens_per_participant": 200},
@@ -362,3 +377,185 @@ class TestHelpers:
         result = DebateOrchestrator._format_other_positions(debate, "a")
         assert "b" in result
         assert "a" not in result.split("\n")[0] if result else True
+
+
+# ============================================================
+# Tests des 3 modes de débat (§3.1.1)
+# ============================================================
+
+class TestDebateModes:
+    """Tests E2E des 3 modes : standard, parallel, blitz."""
+
+    # --- Mode creation ---
+
+    def test_create_debate_default_mode_is_parallel(self, mock_all_deps):
+        """Le mode par défaut est 'parallel' quand aucun mode n'est spécifié."""
+        from app.services.debate.models import DebateMode
+        mock_router, _ = make_mock_router()
+        with patch("app.services.debate.orchestrator.get_llm_router", return_value=mock_router):
+            orch = DebateOrchestrator()
+            debate = orch.create_debate(
+                question="Test mode par défaut ?",
+                participant_specs=[{"model": "model-a"}, {"model": "model-b"}],
+            )
+        assert debate.mode == DebateMode.PARALLEL
+
+    def test_create_debate_standard_mode(self, mock_all_deps):
+        """Mode 'standard' est correctement assigné."""
+        from app.services.debate.models import DebateMode
+        mock_router, _ = make_mock_router()
+        with patch("app.services.debate.orchestrator.get_llm_router", return_value=mock_router):
+            orch = DebateOrchestrator()
+            debate = orch.create_debate(
+                question="Test mode standard ?",
+                participant_specs=[{"model": "model-a"}, {"model": "model-b"}],
+                mode="standard",
+            )
+        assert debate.mode == DebateMode.STANDARD
+
+    def test_create_debate_blitz_mode(self, mock_all_deps):
+        """Mode 'blitz' est correctement assigné."""
+        from app.services.debate.models import DebateMode
+        mock_router, _ = make_mock_router()
+        with patch("app.services.debate.orchestrator.get_llm_router", return_value=mock_router):
+            orch = DebateOrchestrator()
+            debate = orch.create_debate(
+                question="Test blitz ?",
+                participant_specs=[{"model": "model-a"}, {"model": "model-b"}],
+                mode="blitz",
+            )
+        assert debate.mode == DebateMode.BLITZ
+
+    def test_create_debate_invalid_mode_falls_back(self, mock_all_deps):
+        """Mode invalide → fallback sur le mode par défaut."""
+        from app.services.debate.models import DebateMode
+        mock_router, _ = make_mock_router()
+        with patch("app.services.debate.orchestrator.get_llm_router", return_value=mock_router):
+            orch = DebateOrchestrator()
+            debate = orch.create_debate(
+                question="Test ?",
+                participant_specs=[{"model": "model-a"}, {"model": "model-b"}],
+                mode="inexistant",
+            )
+        assert debate.mode == DebateMode.PARALLEL  # fallback
+
+    # --- Mode standard E2E ---
+
+    @pytest.mark.asyncio
+    async def test_standard_mode_has_sequential_rounds(self, mock_all_deps):
+        """Mode standard : rounds séquentiels (Phase 2 exécutée)."""
+        mock_router, mock_provider = make_mock_router()
+        with patch("app.services.debate.orchestrator.get_llm_router", return_value=mock_router), \
+             patch("app.services.debate.verdict.get_llm_router", return_value=mock_router):
+            orch = DebateOrchestrator()
+            debate = orch.create_debate(
+                question="Test standard ?",
+                participant_specs=[{"model": "model-a"}, {"model": "model-b"}],
+                mode="standard",
+            )
+
+            events = []
+            async for event in orch.run(debate):
+                events.append(event)
+
+        event_types = [e["type"] for e in events]
+        # Mode standard : doit avoir des rounds de débat
+        assert "stability" in event_types, "Standard doit avoir une phase de débat avec stabilité"
+        assert debate.status == DebateStatus.COMPLETED
+        # debate_start doit indiquer le mode
+        assert events[0]["mode"] == "standard"
+
+    # --- Mode parallel E2E ---
+
+    @pytest.mark.asyncio
+    async def test_parallel_mode_has_debate_rounds(self, mock_all_deps):
+        """Mode parallel : rounds parallèles (Phase 2 exécutée en //)."""
+        mock_router, _ = make_mock_router()
+        with patch("app.services.debate.orchestrator.get_llm_router", return_value=mock_router), \
+             patch("app.services.debate.verdict.get_llm_router", return_value=mock_router):
+            orch = DebateOrchestrator()
+            debate = orch.create_debate(
+                question="Test parallel ?",
+                participant_specs=[{"model": "model-a"}, {"model": "model-b"}],
+                mode="parallel",
+            )
+
+            events = []
+            async for event in orch.run(debate):
+                events.append(event)
+
+        event_types = [e["type"] for e in events]
+        assert "stability" in event_types, "Parallel doit avoir une phase de débat avec stabilité"
+        assert "verdict" in event_types
+        assert debate.status == DebateStatus.COMPLETED
+        assert events[0]["mode"] == "parallel"
+
+    # --- Mode blitz E2E ---
+
+    @pytest.mark.asyncio
+    async def test_blitz_mode_single_round(self, mock_all_deps):
+        """Mode blitz : opening + 1 round parallèle + verdict (Free-MAD [2])."""
+        # Blitz avec 1 round : 2 opening + 2 debate (1 round //) + 1 verdict = 5 appels
+        blitz_responses = [
+            LLMResponse(content=OPENING_RESPONSE, finish_reason="stop", usage={"total_tokens": 200}),
+            LLMResponse(content=OPENING_RESPONSE, finish_reason="stop", usage={"total_tokens": 200}),
+            # 1 round parallèle (2 participants)
+            LLMResponse(content=DEBATE_RESPONSE, finish_reason="stop", usage={"total_tokens": 300}),
+            LLMResponse(content=DEBATE_RESPONSE, finish_reason="stop", usage={"total_tokens": 300}),
+            # Verdict
+            LLMResponse(content=VERDICT_RESPONSE, finish_reason="stop", usage={"total_tokens": 500}),
+        ]
+        mock_router, _ = make_mock_router(responses=blitz_responses)
+        with patch("app.services.debate.orchestrator.get_llm_router", return_value=mock_router), \
+             patch("app.services.debate.verdict.get_llm_router", return_value=mock_router):
+            orch = DebateOrchestrator()
+            debate = orch.create_debate(
+                question="Test blitz rapide ?",
+                participant_specs=[{"model": "model-a"}, {"model": "model-b"}],
+                mode="blitz",
+            )
+
+            events = []
+            async for event in orch.run(debate):
+                events.append(event)
+
+        event_types = [e["type"] for e in events]
+
+        # Blitz a un verdict (Phase 3 toujours)
+        assert "verdict" in event_types, "Blitz doit avoir un verdict"
+        # Blitz a des turn_end (opening + 1 round)
+        assert "turn_end" in event_types
+        # Statut complété
+        assert debate.status == DebateStatus.COMPLETED
+        # Mode dans debate_start
+        assert events[0]["mode"] == "blitz"
+        # Exactement 1 round (single-round Free-MAD [2])
+        assert len(debate.rounds) == 1, "Blitz doit avoir exactement 1 round de débat (Free-MAD [2])"
+
+    @pytest.mark.asyncio
+    async def test_blitz_mode_fewer_llm_calls(self, mock_all_deps):
+        """Mode blitz : moins d'appels LLM que standard/parallel."""
+        # 2 opening + 2 debate (1 round) + 1 verdict = 5 appels
+        blitz_responses = [
+            LLMResponse(content=OPENING_RESPONSE, finish_reason="stop", usage={"total_tokens": 200}),
+            LLMResponse(content=OPENING_RESPONSE, finish_reason="stop", usage={"total_tokens": 200}),
+            LLMResponse(content=DEBATE_RESPONSE, finish_reason="stop", usage={"total_tokens": 300}),
+            LLMResponse(content=DEBATE_RESPONSE, finish_reason="stop", usage={"total_tokens": 300}),
+            LLMResponse(content=VERDICT_RESPONSE, finish_reason="stop", usage={"total_tokens": 500}),
+        ]
+        mock_router, mock_provider = make_mock_router(responses=blitz_responses)
+        with patch("app.services.debate.orchestrator.get_llm_router", return_value=mock_router), \
+             patch("app.services.debate.verdict.get_llm_router", return_value=mock_router):
+            orch = DebateOrchestrator()
+            debate = orch.create_debate(
+                question="Test blitz tokens ?",
+                participant_specs=[{"model": "model-a"}, {"model": "model-b"}],
+                mode="blitz",
+            )
+
+            async for _ in orch.run(debate):
+                pass
+
+        # Blitz avec 2 participants, 1 round : 2 opening + 2 debate + 1 verdict = 5 appels
+        assert mock_provider.chat_completion.call_count == 5, \
+            f"Blitz devrait faire 5 appels LLM (2+2+1), pas {mock_provider.chat_completion.call_count}"

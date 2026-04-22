@@ -204,7 +204,7 @@ class ToolExecutor:
             return {"status": "ok", "result": result}
         except Exception as e:
             logger.error(f"  ✗ Erreur tool {tool_name}: {e}")
-            return {"status": "error", "error": str(e)}
+            return {"status": "error", "error": "Erreur temporaire lors de l'exécution de l'outil"}
 
     async def _call_mcp_tool(
         self,
@@ -293,7 +293,8 @@ class ToolExecutor:
                         "tools": tool_names,
                     }
         except Exception as e:
-            return {"status": "error", "error": str(e)}
+            logger.error(f"✗ Erreur test connectivité MCP Tools: {e}")
+            return {"status": "error", "error": "Erreur de connectivité MCP Tools"}
 
 
 # ============================================================

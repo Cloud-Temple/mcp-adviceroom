@@ -290,10 +290,12 @@ def show_debates_list_result(result: dict):
     )
     table.add_column("ID", style="dim", max_width=12)
     table.add_column("Question", min_width=30, max_width=50)
+    table.add_column("Mode", justify="center")
     table.add_column("Statut", justify="center")
     table.add_column("Participants", justify="center")
     table.add_column("Rounds", justify="center")
     table.add_column("Tokens", justify="right", style="dim")
+    table.add_column("Durée", justify="right", style="dim")
     table.add_column("Verdict", min_width=14)
     table.add_column("Source", style="dim", justify="center")
 
@@ -349,12 +351,21 @@ def show_debates_list_result(result: dict):
         else:
             verdict_str = "[dim]—[/]"
 
+        # Mode
+        mode = d.get("mode", "")
+        mode_map = {"blitz": "[red]⚡ blitz[/]", "parallel": "[blue]🔄 parallel[/]", "standard": "[yellow]⚙️ standard[/]"}
+        mode_str = mode_map.get(mode, f"[dim]{mode or '—'}[/]")
+
+        # Durée
+        dur_s = d.get("duration_s", 0)
+        dur_str = _dur_s(dur_s) if dur_s else "—"
+
         # Source
         source = d.get("source", "?")
 
         table.add_row(
-            did, question, status_str, p_str, rounds,
-            tokens_str, verdict_str, source,
+            did, question, mode_str, status_str, p_str, rounds,
+            tokens_str, dur_str, verdict_str, source,
         )
 
     console.print(table)
@@ -379,16 +390,24 @@ def show_debate_detail_result(result: dict):
     phase = debate.get("phase", "")
     created = debate.get("created_at", "")[:19] if debate.get("created_at") else ""
     total_tokens = debate.get("total_tokens", 0)
+    mode = debate.get("mode", "")
+    mode_icons = {"blitz": "⚡", "parallel": "🔄", "standard": "⚙️"}
+    mode_display = f"{mode_icons.get(mode, '')} {mode}" if mode else "—"
+    stats = debate.get("stats", {})
+    dur_ms = stats.get("total_duration_ms", 0)
+    dur_display = _dur_s(dur_ms / 1000) if dur_ms else "—"
 
     # ── Header ──
     console.print()
     console.print(Panel.fit(
         f"[bold]ID       :[/bold] [dim]{did}[/dim]\n"
         f"[bold]Question :[/bold] {question}\n"
+        f"[bold]Mode     :[/bold] {mode_display}\n"
         f"[bold]Statut   :[/bold] {status}\n"
         f"[bold]Phase    :[/bold] {phase}\n"
         f"[bold]Créé     :[/bold] {created}\n"
         f"[bold]Tokens   :[/bold] {total_tokens:,}\n"
+        f"[bold]Durée    :[/bold] {dur_display}\n"
         f"[bold]Source   :[/bold] {source}",
         title="🏛️ Détails du Débat",
         border_style="blue",

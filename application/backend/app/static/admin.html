@@ -635,7 +635,15 @@ input:focus { outline: none; border-color: var(--accent); }
             <div id="dc-model-count"></div>
         </div>
         <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;padding-top:4px;border-top:1px solid var(--border)">
-            <div><label style="font-size:0.78rem;color:var(--muted)">Rounds max <span class="tip" data-tip="Un round = un tour de table complet. Le débat dure plusieurs rounds.">?</span></label><select id="dc-rounds" style="margin-top:4px"><option value="3">3</option><option value="5" selected>5</option><option value="7">7</option><option value="10">10</option></select></div>
+            <div><label style="font-size:0.78rem;color:var(--muted)">Mode de débat <span class="tip" data-tip="⚡ Blitz : positions + verdict direct (~1-2 min). 🔄 Parallel : rounds parallèles (~3-8 min). ⚙️ Standard : round-robin séquentiel (~15-25 min).">?</span></label>
+            <div style="display:flex;gap:6px;margin-top:4px" id="dc-mode-btns">
+              <button type="button" class="btn btn-sm" data-mode="blitz" onclick="selectMode('blitz')" style="opacity:0.6">⚡ Blitz</button>
+              <button type="button" class="btn btn-sm" data-mode="parallel" onclick="selectMode('parallel')" style="border-color:var(--teal);color:var(--teal)">🔄 Parallel</button>
+              <button type="button" class="btn btn-sm" data-mode="standard" onclick="selectMode('standard')" style="opacity:0.6">⚙️ Standard</button>
+            </div>
+            <input type="hidden" id="dc-mode" value="parallel">
+            </div>
+            <div><label style="font-size:0.78rem;color:var(--muted)">Rounds max <span class="tip" data-tip="Un round = un tour de table complet. Le débat dure plusieurs rounds.">?</span></label><select id="dc-rounds" style="margin-top:4px"><option value="3" selected>3</option><option value="5">5</option><option value="7">7</option><option value="10">10</option></select></div>
             <button class="btn" onclick="startDebate()" id="dc-start-btn" style="padding:9px 24px;font-size:0.88rem">🚀 Lancer le débat</button>
             <button class="btn btn-secondary" onclick="hideNewDebate()">Annuler</button>
         </div>
@@ -645,7 +653,7 @@ input:focus { outline: none; border-color: var(--accent); }
     <div id="debate-monitor" class="hidden">
         <!-- Header -->
         <div class="dash-header">
-            <h3><span class="live-dot"></span> Débat en cours</h3>
+            <h3><span class="live-dot"></span> Débat en cours <span id="dm-mode-badge" style="font-size:0.85rem;padding:3px 12px;border-radius:6px;font-weight:700;margin-left:8px"></span></h3>
             <div class="dash-controls">
                 <button class="btn btn-sm btn-danger" onclick="stopDebate()" id="dm-stop-btn">🛑 Arrêter</button>
                 <div class="dash-stats" id="dm-stats">
@@ -868,6 +876,13 @@ function verdictLabel(t){
     return m[t]||t||'?';
 }
 function fmtTokens(n){return n>=1000?Math.round(n/1000)+'K':n||0}
+function fmtDuration(s){
+    if(!s)return '';
+    s=Math.round(s);
+    const m=Math.floor(s/60);
+    const sec=s%60;
+    return m>0?m+':'+String(sec).padStart(2,'0'):(sec+'s');
+}
 function fmtDate(s){
     if(!s)return '—';
     try{const d=new Date(s);return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch{return s.substring(0,16)}
@@ -969,14 +984,20 @@ async function loadDebates(){
             :`<span class="badge badge-info">${db.status||'?'}</span>`;
         const confBar=v?`<span class="confidence-bar"><span class="confidence-fill" style="width:${v.confidence}%;background:${confColor(v.confidence)}"></span></span> <span style="font-size:0.75rem;color:var(--muted)">${v.confidence}%</span>`:'';
 
+        const modeIc={'blitz':'⚡','parallel':'🔄','standard':'⚙️'};
+        const modeSt={'blitz':'background:rgba(232,93,93,0.15);color:var(--red)','parallel':'background:rgba(91,141,239,0.15);color:var(--blue)','standard':'background:rgba(232,163,61,0.15);color:var(--orange)'};
+        const dbMode=db.mode||'';
+        const modeBadge=dbMode?`<span class="badge" style="padding:2px 8px;font-size:0.75rem;font-weight:700;${modeSt[dbMode]||''}">${modeIc[dbMode]||''} ${dbMode.toUpperCase()}</span>${tip(TIPS.mode)}`:'';
+
         return `<div class="debate-card" onclick="viewDebate('${db.id}')">
             <div class="question">${esc(db.question||'Sans titre')}</div>
             <div class="meta">
+                ${modeBadge}
                 ${vBadge}
                 ${confBar}
                 <span class="meta-item">💬 ${db.num_rounds||0} rounds</span>
                 <span class="meta-item">🔢 ${fmtTokens(db.total_tokens)} tokens</span>
-                ${db.duration_s?`<span class="meta-item">⏱ ${db.duration_s}s</span>`:''}
+                ${db.duration_s?`<span class="meta-item">⏱ ${fmtDuration(db.duration_s)}</span>`:''}
                 <span class="meta-item">📅 ${fmtDate(db.created_at)}</span>
             </div>
             <div class="participants-row">
@@ -1004,6 +1025,7 @@ const TIPS={
     opening:"Phase initiale où chaque LLM formule sa position SANS voir les autres (anti-ancrage). Produit en parallèle.",
     tokens:"Unités de texte traitées par le LLM. Reflète la longueur et le coût des échanges.",
     persona:"Rôle assigné au LLM (ex: Pragmatique, Avocat du diable, Expert technique) pour diversifier les perspectives.",
+    mode:"Mode de débat : ⚙️ Standard (round-robin séquentiel, ~15-25 min), 🔄 Parallel (asyncio.gather par round, ~3-8 min, DÉFAUT), ⚡ Blitz (1 round parallèle + verdict direct, ~1-2 min).",
 };
 
 /* ===== DEBATE VIEWER ===== */
@@ -1037,7 +1059,8 @@ async function viewDebate(id){
                 <span style="color:var(--muted);font-size:0.78rem">${fmtDate(db.created_at)}</span>
                 <span style="color:var(--muted);font-size:0.78rem">${stats.total_rounds||0} rounds${tip(TIPS.round)}</span>
                 <span style="color:var(--muted);font-size:0.78rem">${fmtTokens(db.total_tokens||stats.total_tokens)} tokens${tip(TIPS.tokens)}</span>
-                ${stats.total_duration_ms?`<span style="color:var(--muted);font-size:0.78rem">${(stats.total_duration_ms/1000).toFixed(1)}s</span>`:''}
+                ${stats.total_duration_ms?`<span style="color:var(--muted);font-size:0.78rem">⏱ ${fmtDuration(stats.total_duration_ms/1000)}</span>`:''}
+                ${(()=>{const m=db.mode||'';const ic={'blitz':'⚡','parallel':'🔄','standard':'⚙️'};const st={'blitz':'background:rgba(232,93,93,0.15);color:var(--red)','parallel':'background:rgba(91,141,239,0.15);color:var(--blue)','standard':'background:rgba(232,163,61,0.15);color:var(--orange)'};return m?`<span class="badge" style="padding:2px 8px;font-size:0.75rem;font-weight:700;${st[m]||''}">${ic[m]||''} ${m.toUpperCase()}</span>${tip(TIPS.mode)}`:''})()}
             </div>
         </div>
     </div>`;
@@ -1481,6 +1504,19 @@ function onPersonaChange(sel){
 }
 
 /* Compteur de modèles sélectionnés */
+function selectMode(mode){
+    document.getElementById('dc-mode').value=mode;
+    document.querySelectorAll('#dc-mode-btns button').forEach(b=>{
+        b.style.opacity=b.dataset.mode===mode?'1':'0.6';
+        b.style.borderColor=b.dataset.mode===mode?'var(--accent)':'var(--border)';
+        b.style.color=b.dataset.mode===mode?'var(--accent)':'var(--text2)';
+    });
+    // Adjust rounds default based on mode
+    const roundsSel=document.getElementById('dc-rounds');
+    if(mode==='blitz'){roundsSel.value='3';roundsSel.disabled=true}
+    else{roundsSel.disabled=false;roundsSel.value=mode==='standard'?'5':'3'}
+}
+
 function updateModelCount(){
     const n=document.querySelectorAll('#dc-models .model-card.selected').length;
     const el=document.getElementById('dc-model-count');
@@ -1526,7 +1562,7 @@ async function startDebate(){
         const resp=await fetch('/api/v1/debates',{
             method:'POST',
             headers:hdr(),
-            body:JSON.stringify({question:q,participants,config:{max_rounds:maxRounds},persona_overrides:Object.keys(persona_overrides).length?persona_overrides:null})
+            body:JSON.stringify({question:q,participants,mode:document.getElementById('dc-mode').value||'parallel',config:{max_rounds:maxRounds},persona_overrides:Object.keys(persona_overrides).length?persona_overrides:null})
         });
         const data=await resp.json();
         if(!resp.ok){throw new Error(data.detail||data.message||'Erreur création')}
@@ -1609,9 +1645,14 @@ function handleLiveEvent(evt,tl,pMap){
     DM_EVENT_COUNT++;
 
     if(t==='debate_start'){
+        // Afficher le mode en gros dans le header
+        const mode=evt.mode||'parallel';
+        const modeStyles={'blitz':'background:rgba(232,93,93,0.2);color:var(--red);border:1px solid rgba(232,93,93,0.4)','parallel':'background:rgba(91,141,239,0.2);color:var(--blue);border:1px solid rgba(91,141,239,0.4)','standard':'background:rgba(232,163,61,0.2);color:var(--orange);border:1px solid rgba(232,163,61,0.4)'};
+        const modeIcons={'blitz':'⚡','parallel':'🔄','standard':'⚙️'};
+        const badge=document.getElementById('dm-mode-badge');
+        if(badge){badge.textContent=(modeIcons[mode]||'')+' '+mode.toUpperCase();badge.style.cssText='font-size:0.85rem;padding:3px 12px;border-radius:6px;font-weight:700;margin-left:8px;'+(modeStyles[mode]||'')}
         (evt.participants||[]).forEach(p=>{
             pMap[p.id]=p;
-            // Init dashboard participant data
             DM_PDATA[p.id]={icon:p.icon||'🤖',name:p.display_name||p.id,provider:p.provider||'?',persona:p.persona_name||'',tokens:0,turns_ok:0,turns_err:0,duration_ms:0,conf:0,thesis:'',tool_calls:0};
         });
         document.getElementById('dm-participants').innerHTML=
@@ -1778,9 +1819,10 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:30px 0}
 .meta{color:#6b7280;font-size:0.82rem}
 </style></head><body>`;
 
+    const modeLabels={'blitz':'⚡ Blitz (~1-2 min)','parallel':'🔄 Parallel (~3-8 min)','standard':'⚙️ Standard (~15-25 min)'};
     h+=`<h1>🏛️ AdviceRoom — Débat</h1>`;
     h+=`<p><strong>Question :</strong> ${esc(db.question)}</p>`;
-    h+=`<p><strong>Date :</strong> ${db.created_at} — <strong>Statut :</strong> ${db.status}</p>`;
+    h+=`<p><strong>Date :</strong> ${db.created_at} — <strong>Statut :</strong> ${db.status}${db.mode?` — <strong>Mode :</strong> ${modeLabels[db.mode]||db.mode}`:''}</p>`;
 
     // Participants
     h+=`<h2>👥 Participants</h2><ul>`;
@@ -1789,8 +1831,8 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:30px 0}
 
     // Stats
     if(stats.total_tokens){
-        h+=`<h2>📊 Statistiques</h2><table><tr><th>Rounds</th><th>Tokens</th><th>Durée</th><th>Appels outils</th></tr>`;
-        h+=`<tr><td>${stats.total_rounds||0}</td><td>${stats.total_tokens||0}</td><td>${((stats.total_duration_ms||0)/1000).toFixed(1)}s</td><td>${stats.tool_calls_count||0}</td></tr></table>`;
+        h+=`<h2>📊 Statistiques</h2><table><tr><th>Mode</th><th>Rounds</th><th>Tokens</th><th>Durée</th><th>Appels outils</th></tr>`;
+        h+=`<tr><td>${modeLabels[db.mode]||db.mode||'—'}</td><td>${stats.total_rounds||0}</td><td>${stats.total_tokens||0}</td><td>${fmtDuration((stats.total_duration_ms||0)/1000)}</td><td>${stats.tool_calls_count||0}</td></tr></table>`;
     }
 
     // Verdict

@@ -4,7 +4,8 @@
 # Architecture : WAF → Backend (FastAPI + MCP) + Frontend
 #
 # Le Backend sert à la fois l'API REST (/api/v1/) et le MCP (/mcp).
-# Le WAF (Caddy) fait le reverse proxy HTTPS vers backend + frontend.
+# Le WAF (Caddy) fait le reverse proxy HTTP vers backend + frontend.
+# TLS/HTTPS est géré par le reverse proxy de production (nginx/traefik).
 #
 # Services actifs : WAF, Backend, Frontend, Redis (4 services)
 # Service prévu : Auth microservice (Phase 3 — Sécurité)
@@ -17,15 +18,15 @@
 services:
 
   # ---------------------------------------------------------
-  # WAF (Caddy) — Reverse proxy + TLS
+  # WAF (Caddy) — Reverse proxy HTTP (TLS géré par le reverse proxy prod)
   # ---------------------------------------------------------
   # Route /api/* et /mcp* → backend:8000
+  # Route /admin* → backend:8000
   # Route /* → frontend:3000
   waf:
     build: ./waf
     ports:
-      - "${WAF_PORT:-443}:443"
-      - "80:80"
+      - "${WAF_PORT:-8088}:8088"
     depends_on:
       backend:
         condition: service_healthy

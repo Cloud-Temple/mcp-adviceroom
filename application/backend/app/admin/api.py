@@ -468,6 +468,7 @@ def _summarize_debate_memory(debate) -> dict:
     return {
         "id": debate.id,
         "question": debate.question,
+        "mode": debate.mode.value if hasattr(debate, 'mode') and hasattr(debate.mode, 'value') else "",
         "status": debate.status.value,
         "phase": debate.phase.value,
         "created_at": debate.created_at.isoformat(),
@@ -518,6 +519,7 @@ def _summarize_debate_dict(full: dict, s3_meta: dict) -> dict:
     return {
         "id": full.get("id", s3_meta.get("id", "")),
         "question": full.get("question", ""),
+        "mode": full.get("mode", ""),
         "status": full.get("status", "unknown"),
         "phase": full.get("phase", ""),
         "created_at": full.get("created_at", ""),

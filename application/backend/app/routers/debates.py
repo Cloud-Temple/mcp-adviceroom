@@ -97,6 +97,9 @@ class ParticipantSpec(BaseModel):
     )
 
 
+_VALID_MODES = {"standard", "parallel", "blitz"}
+
+
 class DebateCreateRequest(BaseModel):
     """Requête de création d'un débat."""
     question: str = Field(
@@ -109,6 +112,10 @@ class DebateCreateRequest(BaseModel):
     persona_overrides: Optional[Dict[str, str]] = Field(
         default=None,
         description="Overrides de personas {model_id: persona_id ou texte libre}",
+    )
+    mode: Optional[str] = Field(
+        default=None,
+        description="Mode de débat : standard | parallel | blitz (§3.1.1, défaut: parallel)",
     )
     config: Optional[Dict[str, Any]] = Field(
         default=None,
@@ -156,12 +163,18 @@ async def create_debate(
             max(int(config_overrides["max_rounds"]), 1), _MAX_ROUNDS
         )
 
+    # V1-03 : valider le mode
+    mode = request.mode
+    if mode and mode not in _VALID_MODES:
+        raise HTTPException(status_code=400, detail=f"Mode invalide. Valeurs: {', '.join(_VALID_MODES)}")
+
     # Créer le débat
     debate = orchestrator.create_debate(
         question=request.question,
         participant_specs=[p.model_dump() for p in request.participants],
         persona_overrides=request.persona_overrides,
         config_overrides=config_overrides,
+        mode=mode,
     )
 
     if len(debate.participants) < 2:

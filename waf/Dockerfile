@@ -5,7 +5,7 @@
 #
 # Build multi-stage :
 # 1. xcaddy compile Caddy avec le plugin Coraza
-# 2. Image finale Alpine minimale
+# 2. Image finale Alpine avec règles CRS
 #
 # Ref: DESIGN/SECURITY_AUDIT_V1.md V1-07
 
@@ -21,7 +21,17 @@ FROM caddy:2-alpine
 # Copier le binaire Caddy compilé avec Coraza
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 
+# Télécharger OWASP CRS v4 (règles WAF)
+RUN apk add --no-cache wget && \
+    wget -q https://github.com/coreruleset/coreruleset/releases/download/v4.8.0/coreruleset-4.8.0-minimal.tar.gz && \
+    tar xzf coreruleset-4.8.0-minimal.tar.gz && \
+    mkdir -p /etc/caddy/crs && \
+    mv coreruleset-4.8.0/* /etc/caddy/crs/ && \
+    cp /etc/caddy/crs/crs-setup.conf.example /etc/caddy/crs/crs-setup.conf && \
+    rm -rf coreruleset-4.8.0-minimal.tar.gz coreruleset-4.8.0 && \
+    apk del wget
+
 # Copier la configuration
 COPY Caddyfile /etc/caddy/Caddyfile
 
-EXPOSE 80 443
+EXPOSE 8088

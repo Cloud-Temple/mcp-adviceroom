@@ -1,47 +1,60 @@
 # ============================================================
-# AdviceRoom — WAF Caddy Configuration
+# AdviceRoom — WAF Caddy + Coraza Configuration
 # ============================================================
-# Reverse proxy + TLS + HSTS
+# Reverse proxy HTTP sur port 8088 (pas de TLS — géré par le reverse proxy prod)
 # Sécurité: DESIGN/SECURITY_AUDIT_V1.md V1-07, V1-11, V1-16
 #
-# TODO V1-07: Compiler Caddy avec module Coraza pour OWASP CRS
-# TODO V1-07: Activer rate limiting (caddy-ratelimit plugin)
+# Coraza WAF activé avec OWASP CRS v4 (protection applicative).
+# Rate limiting géré par le reverse proxy de production.
 
-:443 {
-    # TLS automatique (self-signed pour dev)
-    tls internal
-
-    # V1-16 : HSTS 2 ans + preload
-    header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-
-    # Sécurité headers supplémentaires
-    header X-Content-Type-Options "nosniff"
-    header X-Frame-Options "DENY"
-    header Referrer-Policy "strict-origin-when-cross-origin"
-
-    # V1-11 : Admin console (proxifié par le WAF)
-    handle /admin* {
-        reverse_proxy backend:8000
-    }
-
-    # Backend API + MCP
-    handle /api/* {
-        reverse_proxy backend:8000
-    }
-    handle /mcp* {
-        reverse_proxy backend:8000
-    }
-    handle /health {
-        reverse_proxy backend:8000
-    }
-
-    # Frontend
-    handle {
-        reverse_proxy frontend:3000
-    }
+{
+	# Charger le module Coraza en premier dans la chaîne de directives
+	order coraza_waf first
 }
 
-# HTTP → HTTPS redirect
-:80 {
-    redir https://{host}{uri} permanent
+:8088 {
+	# --- WAF Coraza (OWASP CRS v4) — V1-07 ---
+	coraza_waf {
+		load_owasp_crs
+		directives `
+			Include /etc/caddy/crs/crs-setup.conf
+			Include /etc/caddy/crs/rules/*.conf
+			SecRuleEngine On
+			SecRequestBodyAccess On
+			SecResponseBodyAccess Off
+			SecRequestBodyLimit 1048576
+			SecRequestBodyNoFilesLimit 131072
+			SecAuditEngine RelevantOnly
+			SecAuditLog /dev/stderr
+		`
+	}
+
+	# Pas de TLS — le reverse proxy de production (nginx/traefik) gère HTTPS
+	# HSTS et TLS headers sont ajoutés par le reverse proxy prod
+
+	# Sécurité headers (V1-16, appliqués aussi en interne par précaution)
+	header X-Content-Type-Options "nosniff"
+	header X-Frame-Options "DENY"
+	header Referrer-Policy "strict-origin-when-cross-origin"
+
+	# V1-11 : Admin console (proxifié par le WAF)
+	handle /admin* {
+		reverse_proxy backend:8000
+	}
+
+	# Backend API + MCP
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+	handle /mcp* {
+		reverse_proxy backend:8000
+	}
+	handle /health {
+		reverse_proxy backend:8000
+	}
+
+	# Frontend
+	handle {
+		reverse_proxy frontend:3000
+	}
 }

@@ -1,9 +1,9 @@
 # AdviceRoom — Architecture Document v1.0
 
-> **Date** : 17 avril 2026
+> **Date** : 17 avril 2026 (mis à jour 22 avril 2026)
 > **Auteur** : Christophe Lesur / Agent Cline
 > **Licence** : Apache 2.0, open-source
-> **Statut** : v1.0 — en attente de validation
+> **Statut** : v1.1 — validé et vérifié
 
 ---
 
@@ -36,27 +36,27 @@ L'architecture s'appuie sur les papiers de recherche suivants (2024-2025) :
 
 #### 🔴 Tier 1 — Structurants (définissent le cœur du protocole)
 
-| Réf. | Papier | Contribution majeure | Pourquoi structurant | Intégré dans AdviceRoom |
-| ---- | ------ | -------------------- | -------------------- | ----------------------- |
-| [2]  | **Free-MAD** (arXiv 2509.11035) | Paradigme consensus-free : évalue la trajectoire entière du débat. Mode conformité + anti-conformité | **Façonne 3 des 7 principes** : verdict par trajectoire (§3.4), challenge obligatoire (§14), dissensus accepté. C'est le papier qui a le plus d'influence directe sur le protocole AdviceRoom | Verdict par analyse de trajectoire, challenge obligatoire |
-| [5]  | **Can LLM Agents Really Debate?** (arXiv 2511.07784) | Les LLMs tendent au conformisme. Le biais majoritaire est le défi #1. Le vote majoritaire seul explique la plupart des gains attribués au débat | **Identifie LE problème central** que notre protocole doit résoudre. Sans ce papier, on n'aurait pas de §14 (enforcement anti-conformité). Le conformisme est notre risque #1 (§11) | Anti-conformité forcée dans le prompt + validation post-tour (§14) |
-| [1]  | **Multi-LLM Debate** (NeurIPS 2024) | Framework théorique bayésien. Echo chamber, tyrannie de la majorité, misconceptions partagées via training data corrélée. Propose diversity pruning, quality pruning, misconception refutation | **Fournit la justification théorique** de tout le projet. Prouve mathématiquement que le débat entre modèles similaires est futile (→ notre choix de LLMs hétérogènes multi-provider) | Positions initiales en parallèle (déduit du théorème echo chamber). Note : diversity pruning et misconception refutation non implémentés en v1 |
+| Réf. | Papier                                               | Contribution majeure                                                                                                                                                                           | Pourquoi structurant                                                                                                                                                                          | Intégré dans AdviceRoom                                                                                                                        |
+| ---- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| [2]  | **Free-MAD** (arXiv 2509.11035)                      | Paradigme consensus-free : évalue la trajectoire entière du débat. Mode conformité + anti-conformité                                                                                           | **Façonne 3 des 7 principes** : verdict par trajectoire (§3.4), challenge obligatoire (§14), dissensus accepté. C'est le papier qui a le plus d'influence directe sur le protocole AdviceRoom | Verdict par analyse de trajectoire, challenge obligatoire                                                                                      |
+| [5]  | **Can LLM Agents Really Debate?** (arXiv 2511.07784) | Les LLMs tendent au conformisme. Le biais majoritaire est le défi #1. Le vote majoritaire seul explique la plupart des gains attribués au débat                                                | **Identifie LE problème central** que notre protocole doit résoudre. Sans ce papier, on n'aurait pas de §14 (enforcement anti-conformité). Le conformisme est notre risque #1 (§11)           | Anti-conformité forcée dans le prompt + validation post-tour (§14)                                                                             |
+| [1]  | **Multi-LLM Debate** (NeurIPS 2024)                  | Framework théorique bayésien. Echo chamber, tyrannie de la majorité, misconceptions partagées via training data corrélée. Propose diversity pruning, quality pruning, misconception refutation | **Fournit la justification théorique** de tout le projet. Prouve mathématiquement que le débat entre modèles similaires est futile (→ notre choix de LLMs hétérogènes multi-provider)         | Positions initiales en parallèle (déduit du théorème echo chamber). Note : diversity pruning et misconception refutation non implémentés en v1 |
 
 #### 🟡 Tier 2 — Fonctionnels (définissent des composants clés)
 
-| Réf. | Papier | Contribution majeure | Pourquoi fonctionnel | Intégré dans AdviceRoom |
-| ---- | ------ | -------------------- | -------------------- | ----------------------- |
-| [7]  | **Persona-Driven Multi-Agent** (COLING 2025) | Assigner des personas distinctes maximise la diversité et la persuasion des arguments | **Définit §3.5 entièrement** : les 5 personas, l'attribution automatique, l'injection dans les prompts. Sans ce papier, tous les LLMs auraient le même angle d'analyse | Attribution automatique de personas/angles |
-| [3]  | **Stability Detection** (arXiv 2510.12697) | Détection adaptative de stabilité via Beta-Binomial + test KS. Surpasse le vote majoritaire | **Définit §13 entièrement** : l'arrêt adaptatif au lieu d'un nombre fixe de rounds. Approche simplifiée en heuristiques pour notre contexte de débat ouvert | Détection de stabilité pour arrêt adaptatif (heuristiques inspirées du Beta-Binomial+KS — voir §13) |
-| [9]  | **Tool-MAD** (arXiv 2601.04742) | Débat multi-agent avec outils hétérogènes par agent + reformulation adaptative des requêtes + scoring hallucinations | **Justifie §4.2.4 (Tool Router)** : donner accès aux outils pendant le débat. Le papier montre +5.5% accuracy avec outils. AdviceRoom donne les mêmes outils à tous (le papier donne des outils différents — amélioration v2) | Tous les LLMs ont accès aux mêmes outils |
+| Réf. | Papier                                       | Contribution majeure                                                                                                 | Pourquoi fonctionnel                                                                                                                                                                                                          | Intégré dans AdviceRoom                                                                             |
+| ---- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| [7]  | **Persona-Driven Multi-Agent** (COLING 2025) | Assigner des personas distinctes maximise la diversité et la persuasion des arguments                                | **Définit §3.5 entièrement** : les 5 personas, l'attribution automatique, l'injection dans les prompts. Sans ce papier, tous les LLMs auraient le même angle d'analyse                                                        | Attribution automatique de personas/angles                                                          |
+| [3]  | **Stability Detection** (arXiv 2510.12697)   | Détection adaptative de stabilité via Beta-Binomial + test KS. Surpasse le vote majoritaire                          | **Définit §13 entièrement** : l'arrêt adaptatif au lieu d'un nombre fixe de rounds. Approche simplifiée en heuristiques pour notre contexte de débat ouvert                                                                   | Détection de stabilité pour arrêt adaptatif (heuristiques inspirées du Beta-Binomial+KS — voir §13) |
+| [9]  | **Tool-MAD** (arXiv 2601.04742)              | Débat multi-agent avec outils hétérogènes par agent + reformulation adaptative des requêtes + scoring hallucinations | **Justifie §4.2.4 (Tool Router)** : donner accès aux outils pendant le débat. Le papier montre +5.5% accuracy avec outils. AdviceRoom donne les mêmes outils à tous (le papier donne des outils différents — amélioration v2) | Tous les LLMs ont accès aux mêmes outils                                                            |
 
 #### 🟢 Tier 3 — Cadrage philosophique (orientent les choix sans définir de composant)
 
-| Réf. | Papier | Contribution majeure | Pourquoi cadrage | Intégré dans AdviceRoom |
-| ---- | ------ | -------------------- | ---------------- | ----------------------- |
-| [6]  | **Consensus-Diversity Trade-off** (arXiv 2502.16565 / EMNLP 2025) | Le consensus implicite surpasse le consensus explicite. La diversité partielle booste l'exploration et la robustesse | **Valide le choix du verdict à 3 issues** (consensus, consensus_partiel, dissensus). Nous autorise à accepter le désaccord comme un résultat valide, pas un échec | Dissensus structuré accepté comme issue valide |
-| [4]  | **Debate Protocols** (arXiv 2603.28813) | Comparaison de protocoles (WR, CR, RA-CR). Trade-off entre interaction et convergence | **Confirme le choix du round-robin** (Cross-Round) comme meilleur compromis. Pourrait nous inspirer en v2 pour rendre le protocole configurable | Round-robin avec challenge obligatoire |
-| [8]  | **Society of Thought** (arXiv 2601.10825) | Les modèles de raisonnement simulent implicitement un débat multi-perspectives interne | **Validation conceptuelle pure** : si un seul LLM simule un débat interne pour mieux raisonner, un débat explicite entre LLMs doit être encore plus puissant. Renforce la raison d'être du projet | Valide le concept fondamental |
+| Réf. | Papier                                                            | Contribution majeure                                                                                                 | Pourquoi cadrage                                                                                                                                                                                  | Intégré dans AdviceRoom                        |
+| ---- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| [6]  | **Consensus-Diversity Trade-off** (arXiv 2502.16565 / EMNLP 2025) | Le consensus implicite surpasse le consensus explicite. La diversité partielle booste l'exploration et la robustesse | **Valide le choix du verdict à 3 issues** (consensus, consensus_partiel, dissensus). Nous autorise à accepter le désaccord comme un résultat valide, pas un échec                                 | Dissensus structuré accepté comme issue valide |
+| [4]  | **Debate Protocols** (arXiv 2603.28813)                           | Comparaison de protocoles (WR, CR, RA-CR). Trade-off entre interaction et convergence                                | **Définit les 3 modes** : standard = WR (peer-referencing max), parallel = CR (compromis vitesse/profondeur), blitz ≈ NI (diversité max). RA-CR (convergence max) → amélioration v2               | 3 modes WR/CR/NI implémentés                   |
+| [8]  | **Society of Thought** (arXiv 2601.10825)                         | Les modèles de raisonnement simulent implicitement un débat multi-perspectives interne                               | **Validation conceptuelle pure** : si un seul LLM simule un débat interne pour mieux raisonner, un débat explicite entre LLMs doit être encore plus puissant. Renforce la raison d'être du projet | Valide le concept fondamental                  |
 
 ### 2.2 Principes retenus
 
@@ -67,6 +67,7 @@ L'architecture s'appuie sur les papiers de recherche suivants (2024-2025) :
 5. **Arrêt adaptatif** : détection de stabilité, pas un nombre fixe de rounds — [3]
 6. **Verdict par trajectoire** : analyse du débat entier, pas du dernier round — [2]
 7. **Outils pour tous** : chaque LLM a accès aux mêmes outils — [9]
+8. **Protocole adaptatif** : 3 modes (standard/parallel/blitz) sélectionnés conditionnellement selon le besoin de profondeur vs. vitesse — [2, 4, 5]
 
 ---
 
@@ -75,31 +76,66 @@ L'architecture s'appuie sur les papiers de recherche suivants (2024-2025) :
 ### 3.1 Vue d'ensemble
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    PROTOCOLE ADVICEROOM                        │
-│                                                                │
-│  Phase 1: OPENING (parallèle)                                  │
-│  ┊  Tous les LLMs produisent leur position initiale            │
-│  ┊  EN MÊME TEMPS → évite le biais d'ancrage                  │
-│  ┊  Chaque LLM reçoit un persona + accès aux outils           │
-│                                                                │
-│  Phase 2: DEBATE (round-robin, max N rounds)                   │
-│  ┊  Chaque LLM à son tour :                                   │
-│  ┊    1. Voit les positions des autres                         │
-│  ┊    2. Répond aux arguments (accord/désaccord)               │
-│  ┊    3. DOIT challenger ≥1 argument (anti-conformité)         │
-│  ┊    4. Peut utiliser des outils (recherche, calcul...)       │
-│  ┊    5. Peut poser une question à l'utilisateur → PAUSE       │
-│  ┊    6. Met à jour sa position + confidence                   │
-│  ┊  → Détection de stabilité après chaque round                │
-│  ┊  → Si stable → Phase 3                                     │
-│                                                                │
-│  Phase 3: VERDICT (LLM synthétiseur dédié)                     │
-│  ┊  Analyse la trajectoire entière du débat                    │
-│  ┊  Produit : verdict + points d'accord/divergence             │
-│  ┊  + recommandation + confidence score                        │
-└──────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                      PROTOCOLE ADVICEROOM                            │
+│                                                                      │
+│  Phase 1: OPENING (toujours parallèle)                               │
+│  ┊  Tous les LLMs produisent leur position initiale                  │
+│  ┊  EN MÊME TEMPS → évite le biais d'ancrage [1]                    │
+│  ┊  Chaque LLM reçoit un persona [7] + accès aux outils [9]         │
+│  ┊  Mode blitz : prompt concis (500 tok max, pas d'outils)          │
+│                                                                      │
+│  Phase 2: DEBATE (optionnelle — sautée en mode blitz)                │
+│  ┊  Mode standard : round-robin séquentiel (Within-Round [4])       │
+│  ┊  Mode parallel : tous en parallèle (Cross-Round [4])             │
+│  ┊  Chaque LLM :                                                    │
+│  ┊    1. Voit les positions des autres (same-round si std, N-1 si //) │
+│  ┊    2. DOIT challenger ≥1 argument (anti-conformité [2, 5])       │
+│  ┊    3. Peut utiliser des outils (recherche, calcul...)             │
+│  ┊    4. Peut poser une question à l'utilisateur → PAUSE            │
+│  ┊    5. Met à jour sa position + confidence                         │
+│  ┊  → Détection de stabilité après chaque round [3]                 │
+│  ┊  → Si stable → Phase 3                                           │
+│                                                                      │
+│  Phase 3: VERDICT (toujours)                                         │
+│  ┊  LLM synthétiseur dédié analyse la trajectoire [2]               │
+│  ┊  Produit : consensus | consensus_partiel | dissensus [6]         │
+│  ┊  + points d'accord/divergence + recommandation + confidence       │
+└──────────────────────────────────────────────────────────────────────┘
 ```
+
+### 3.1.1 Modes de débat (§2.2 principe 8)
+
+> **Fondement académique** : le papier [4] (Debate Protocols) montre que "*interaction-rich and convergence-oriented protocols should be selected **conditionally***". Le papier [2] (Free-MAD) démontre qu'un *"single-round debate"* suffit pour certains cas. Le papier [5] montre que "*majority voting alone drives most performance gains*" — ce qui justifie le mode blitz (positions parallèles + verdict direct).
+
+Trois modes sont disponibles, sélectionnés à la création du débat :
+
+| Mode                    | Phase 2                                      | Turns       | Tools | Concision        | Temps estimé | Cas d'usage                               |
+| ----------------------- | -------------------------------------------- | ----------- | ----- | ---------------- | ------------ | ----------------------------------------- |
+| **`standard`**          | ✅ Round-robin séquentiel (Within-Round [4]) | Séquentiels | ✅    | Normal           | 15-25 min    | Débats approfondis, questions critiques   |
+| **`parallel`** (défaut) | ✅ Tous en parallèle (Cross-Round [4])       | Parallèles  | ✅    | Normal           | 3-8 min      | Cas général, bon ratio profondeur/vitesse |
+| **`blitz`**             | ❌ Sautée                                    | Parallèles  | ❌    | Forcée (500 tok) | 1-2 min      | Brainstorm, exploration rapide            |
+
+**Mode `standard`** — Within-Round (WR) [4] :
+- Chaque participant parle à tour de rôle (round-robin séquentiel)
+- **Same-round visibility** : chaque LLM voit les positions des LLMs qui ont déjà parlé dans le même round
+- Le papier [4] montre que WR produit le plus de peer-referencing (PRR) — maximum d'interaction croisée
+- Anti-conformité avec challenge obligatoire + validation post-tour
+- Le plus lent mais le plus riche en termes d'argumentation croisée
+
+**Mode `parallel`** (défaut) — Cross-Round (CR) [4] :
+- Tous les participants parlent en même temps dans chaque round (`asyncio.gather`)
+- Chaque participant voit les positions du round **précédent** (pas du round en cours — pas de same-round visibility)
+- Anti-conformité maintenue (challenge basé sur les positions du round précédent)
+- **3× plus rapide** que le mode standard à nombre de rounds égal
+
+**Mode `blitz`** — No-Interaction [4] + Single-round [2] :
+- Phase 2 (DEBATE) entièrement sautée
+- Opening parallèle avec prompt concis (500 tokens max, bullet points, pas d'outils)
+- Passage direct au verdict qui analyse les N positions de l'opening
+- Exploite le fait que "*majority voting alone drives most performance gains*" [5]
+- **10× plus rapide** que le mode standard
+- Trade-off : pas de challenge inter-participants, risque de conformisme non détecté
 
 ### 3.2 Phase 1 — Opening
 
@@ -840,15 +876,16 @@ mcp-adviceroom/
 
 ## 11. Risques identifiés
 
-| Risque                     | Impact                                       | Probabilité | Mitigation                                                                      |
-| -------------------------- | -------------------------------------------- | ----------- | ------------------------------------------------------------------------------- |
-| **Conformisme des LLMs**   | Les LLMs s'alignent tous → débat inutile     | Élevée      | Anti-conformité forcée (challenge obligatoire) + positions initiales parallèles |
-| **Coût token élevé**       | Un débat 5 LLMs × 5 rounds = 100-200K tokens | Certaine    | Pas un problème (décision Christophe) mais métriques pour suivi                 |
-| **Latence**                | 5 LLMs séquentiels en phase débat = lent     | Élevée      | Streaming NDJSON + positions initiales en parallèle                             |
-| **Provider API down**      | Un LLM indisponible bloque le débat          | Moyenne     | Timeout + graceful degradation (le débat continue sans ce participant)          |
-| **Biais d'ancrage**        | Le premier LLM à parler influence les autres | Élevée      | Phase 1 parallèle résout ce problème                                            |
-| **Complexité du contexte** | Le contexte grossit à chaque round           | Moyenne     | Smart truncation (hérité de QuoteFlow)                                          |
-| **Détection de stabilité** | Faux positifs/négatifs sur la convergence    | Moyenne     | Nombre max de rounds en sécurité                                                |
+| Risque                              | Impact                                       | Probabilité | Mitigation                                                                              |
+| ----------------------------------- | -------------------------------------------- | ----------- | --------------------------------------------------------------------------------------- |
+| **Conformisme des LLMs**            | Les LLMs s'alignent tous → débat inutile     | Élevée      | Anti-conformité forcée (challenge obligatoire) + positions initiales parallèles         |
+| **Coût token élevé**                | Un débat 5 LLMs × 5 rounds = 100-200K tokens | Certaine    | Pas un problème (décision Christophe) mais métriques pour suivi                         |
+| **Latence**                         | 5 LLMs séquentiels en phase débat = lent     | Élevée      | 3 modes adaptatifs [4] : parallel (3×), blitz (10×) + streaming NDJSON                  |
+| **Conformisme non détecté (blitz)** | Pas de rounds de challenge en mode blitz     | Moyenne     | Trade-off accepté : blitz pour l'exploration, standard pour les décisions critiques [5] |
+| **Provider API down**               | Un LLM indisponible bloque le débat          | Moyenne     | Timeout + graceful degradation (le débat continue sans ce participant)                  |
+| **Biais d'ancrage**                 | Le premier LLM à parler influence les autres | Élevée      | Phase 1 parallèle résout ce problème                                                    |
+| **Complexité du contexte**          | Le contexte grossit à chaque round           | Moyenne     | Smart truncation (hérité de QuoteFlow)                                                  |
+| **Détection de stabilité**          | Faux positifs/négatifs sur la convergence    | Moyenne     | Nombre max de rounds en sécurité                                                        |
 
 ---
 

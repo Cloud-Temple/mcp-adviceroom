@@ -23,6 +23,7 @@ from .context_builder import ContextBuilder
 from .models import (
     ChallengeQuality,
     Debate,
+    DebateMode,
     DebatePhase,
     DebateStatus,
     Participant,
@@ -118,8 +119,18 @@ class DebateOrchestrator:
         self._verdict_synth = VerdictSynthesizer(self._context_builder)
 
         limits = self._config.get("limits", {})
-        self._max_rounds: int = limits.get("max_rounds", 5)
         self._max_participants: int = limits.get("max_participants", 5)
+
+        # Mode par défaut et configs des modes (§3.1.1)
+        self._default_mode: str = self._config.get("default_mode", "parallel")
+        self._modes_config: Dict[str, Any] = self._config.get("modes", {})
+
+        # Valeurs par défaut (surchargées par le mode actif dans create_debate)
+        self._max_rounds: int = 5
+        self._min_rounds: int = 1
+        self._parallel_turns: bool = True
+        self._tools_enabled: bool = True
+        self._max_response_tokens: Optional[int] = None
 
         errors = self._config.get("error_handling", {})
         self._provider_timeout: int = errors.get("provider_timeout_seconds", 120)
@@ -140,6 +151,7 @@ class DebateOrchestrator:
         participant_specs: List[Dict[str, str]],
         persona_overrides: Optional[Dict[str, str]] = None,
         config_overrides: Optional[Dict[str, Any]] = None,
+        mode: Optional[str] = None,
     ) -> Debate:
         """
         Crée un objet Debate prêt à être exécuté.
@@ -149,11 +161,28 @@ class DebateOrchestrator:
             participant_specs: Liste de {"provider": ..., "model": ...}.
             persona_overrides: Dict {model_id: persona_id} (optionnel).
             config_overrides: Surcharges de config (max_rounds, etc.).
+            mode: Mode de débat "standard" | "parallel" | "blitz" (§3.1.1).
 
         Returns:
             Debate initialisé avec participants et personas.
         """
         router = get_llm_router()
+
+        # Résoudre le mode de débat (§3.1.1)
+        mode_str = mode or self._default_mode
+        try:
+            debate_mode = DebateMode(mode_str)
+        except ValueError:
+            logger.warning(f"⚠ Mode '{mode_str}' inconnu — fallback sur '{self._default_mode}'")
+            debate_mode = DebateMode(self._default_mode)
+
+        # Charger la config du mode
+        mode_cfg = self._modes_config.get(debate_mode.value, {})
+        self._max_rounds = mode_cfg.get("max_rounds", 3)
+        self._min_rounds = mode_cfg.get("min_rounds", 1)
+        self._parallel_turns = mode_cfg.get("parallel_turns", True)
+        self._tools_enabled = mode_cfg.get("tools_enabled", True)
+        self._max_response_tokens = mode_cfg.get("max_response_tokens") or None
 
         # Résoudre les participants depuis le registre de modèles
         participants = []
@@ -173,18 +202,22 @@ class DebateOrchestrator:
         # Attribuer les personas
         self._persona_manager.assign_personas(participants, persona_overrides)
 
-        # Appliquer les surcharges de config
+        # Appliquer les surcharges de config (max_rounds borné par le mode)
         if config_overrides:
             if "max_rounds" in config_overrides:
                 self._max_rounds = min(
                     config_overrides["max_rounds"],
-                    self._config.get("limits", {}).get("max_rounds", 5),
+                    mode_cfg.get("max_rounds", 5),
                 )
 
-        debate = Debate(question=question, participants=participants)
+        debate = Debate(
+            question=question,
+            mode=debate_mode,
+            participants=participants,
+        )
         logger.info(
             f"✓ Débat créé : {len(participants)} participants, "
-            f"max_rounds={self._max_rounds}"
+            f"mode={debate_mode.value}, max_rounds={self._max_rounds}"
         )
         return debate
 
@@ -207,18 +240,26 @@ class DebateOrchestrator:
         debate.status = DebateStatus.RUNNING
         yield {"type": "debate_start", "debate_id": debate.id,
                "question": debate.question,
+               "mode": debate.mode.value,
                "participants": [self._participant_info(p) for p in debate.participants]}
 
         try:
-            # Phase 1 — OPENING
+            # Phase 1 — OPENING (toujours parallèle)
             async for event in self._run_opening(debate):
                 yield event
 
-            # Phase 2 — DEBATE ROUNDS
-            async for event in self._run_debate_rounds(debate):
-                yield event
+            # Phase 2 — DEBATE ROUNDS (sautée en mode blitz — §3.1.1)
+            if self._max_rounds > 0:
+                if self._parallel_turns:
+                    async for event in self._run_parallel_debate_rounds(debate):
+                        yield event
+                else:
+                    async for event in self._run_debate_rounds(debate):
+                        yield event
+            else:
+                logger.info("⚡ Mode blitz — Phase 2 sautée, passage direct au verdict")
 
-            # Phase 3 — VERDICT
+            # Phase 3 — VERDICT (toujours)
             async for event in self._run_verdict(debate):
                 yield event
 
@@ -231,8 +272,8 @@ class DebateOrchestrator:
         except Exception as e:
             logger.error(f"✗ Erreur fatale dans le débat : {e}")
             debate.status = DebateStatus.ERROR
-            debate.error = str(e)
-            yield {"type": "error", "debate_id": debate.id, "error": str(e)}
+            debate.error = "Erreur interne lors du débat"
+            yield {"type": "error", "debate_id": debate.id, "error": "Erreur interne lors du débat"}
 
     # ============================================================
     # Phase 1 — OPENING (parallèle, anti-ancrage)
@@ -265,7 +306,7 @@ class DebateOrchestrator:
                 logger.error(f"✗ Opening échoué pour {participant.id}: {result}")
                 turn = Turn(
                     participant_id=participant.id, round_number=0,
-                    phase=DebatePhase.OPENING, error=str(result),
+                    phase=DebatePhase.OPENING, error="Erreur lors de la génération de la position initiale",
                 )
             else:
                 turn = result
@@ -304,7 +345,13 @@ class DebateOrchestrator:
     # ============================================================
 
     async def _run_debate_rounds(self, debate: Debate) -> AsyncGenerator[Dict, None]:
-        """Rounds de débat avec détection de stabilité."""
+        """
+        Rounds de débat séquentiels — Within-Round [4].
+
+        Chaque participant parle à tour de rôle. Les agents suivants voient
+        les turns déjà complétés dans le même round (same-round visibility).
+        C'est le protocole WR du papier [4], qui maximise le peer-referencing.
+        """
         debate.phase = DebatePhase.DEBATE
 
         for round_num in range(1, self._max_rounds + 1):
@@ -324,15 +371,18 @@ class DebateOrchestrator:
                        "active": len(active_participants)}
                 return
 
-            # Round-robin séquentiel (§3.3)
+            # Round-robin séquentiel Within-Round [4] (§3.3)
+            # Chaque agent voit les turns déjà complétés dans le même round
             for participant in active_participants:
                 yield {"type": "turn_start",
                        "participant": self._participant_info(participant),
                        "round": round_num}
 
                 try:
+                    # Within-Round [4] : passer rnd.turns (same-round visibility)
                     turn = await self._run_single_turn(
-                        participant, debate, round_num, DebatePhase.DEBATE
+                        participant, debate, round_num, DebatePhase.DEBATE,
+                        current_round_turns=list(rnd.turns),  # copie pour éviter les mutations
                     )
 
                     # Anti-conformité check (§14)
@@ -359,7 +409,7 @@ class DebateOrchestrator:
                     participant.consecutive_skips += 1
                     rnd.turns.append(Turn(
                         participant_id=participant.id, round_number=round_num,
-                        phase=DebatePhase.DEBATE, error=str(e),
+                        phase=DebatePhase.DEBATE, error="Erreur lors du tour de débat",
                     ))
 
                     # Skip threshold (§15)
@@ -399,6 +449,116 @@ class DebateOrchestrator:
                         te["tool_calls"] = last_turn.tool_calls
                     if last_turn.tool_results:
                         te["tool_results"] = last_turn.tool_results
+                yield te
+
+            debate.rounds.append(rnd)
+
+            # Détection de stabilité (§13)
+            stability = self._stability_detector.evaluate(debate, round_num)
+            rnd.stability_score = stability.score
+            yield {"type": "stability", **stability.to_dict()}
+
+            if stability.can_stop:
+                logger.info(f"✓ Débat stable après round {round_num} — passage au verdict")
+                return
+
+    # ============================================================
+    # Phase 2 bis — DEBATE PARALLÈLE (Within-Round [4])
+    # ============================================================
+
+    async def _run_parallel_debate_rounds(self, debate: Debate) -> AsyncGenerator[Dict, None]:
+        """
+        Rounds de débat avec turns parallèles — Cross-Round [4].
+
+        Cross-Round [4] : tous les participants parlent en même temps.
+        Chaque participant voit les positions du round PRÉCÉDENT (pas du round en cours).
+        Pas de same-round visibility (contrairement au mode standard/WR).
+        3× plus rapide que le mode standard.
+        """
+        debate.phase = DebatePhase.DEBATE
+
+        for round_num in range(1, self._max_rounds + 1):
+            yield {"type": "phase", "phase": "debate", "round": round_num}
+
+            rnd = Round(number=round_num)
+            active_participants = [p for p in debate.participants if p.active]
+
+            # Vérifier le minimum de participants actifs (§15)
+            if len(active_participants) < self._min_active:
+                logger.error(
+                    f"✗ Seulement {len(active_participants)} participants actifs "
+                    f"(min={self._min_active}) — arrêt"
+                )
+                debate.phase = DebatePhase.ERROR
+                yield {"type": "error", "reason": "insufficient_participants",
+                       "active": len(active_participants)}
+                return
+
+            # Émettre turn_start pour tous (parallèle)
+            for p in active_participants:
+                yield {"type": "turn_start",
+                       "participant": self._participant_info(p),
+                       "round": round_num}
+
+            # Exécuter TOUS les turns en parallèle (asyncio.gather)
+            tasks = [
+                self._run_single_turn(p, debate, round_num, DebatePhase.DEBATE)
+                for p in active_participants
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Traiter les résultats
+            for i, result in enumerate(results):
+                participant = active_participants[i]
+
+                if isinstance(result, Exception):
+                    logger.error(f"✗ Tour échoué {participant.id} round {round_num}: {result}")
+                    participant.consecutive_skips += 1
+                    turn = Turn(
+                        participant_id=participant.id, round_number=round_num,
+                        phase=DebatePhase.DEBATE, error="Erreur lors du tour de débat",
+                    )
+                    if participant.consecutive_skips >= self._skip_threshold:
+                        participant.active = False
+                        logger.warning(f"⚠ {participant.id} retiré après {self._skip_threshold} rounds skipés")
+                else:
+                    turn = result
+                    # Anti-conformité check (§14) — même en parallèle
+                    if turn.structured_position:
+                        turn = await self._check_anti_conformity(
+                            turn, participant, debate, round_num
+                        )
+                    participant.consecutive_skips = 0
+
+                rnd.turns.append(turn)
+                debate.total_tokens += turn.tokens_used
+
+                # Événement turn_end enrichi
+                te: Dict[str, Any] = {
+                    "type": "turn_end",
+                    "participant_id": participant.id,
+                    "participant": self._participant_info(participant),
+                    "round": round_num,
+                    "has_position": bool(turn.structured_position),
+                    "content": turn.content,
+                    "tokens_used": turn.tokens_used,
+                    "duration_ms": turn.duration_ms,
+                }
+                if turn.structured_position:
+                    pos = turn.structured_position
+                    te["position"] = {
+                        "thesis": pos.thesis,
+                        "confidence": pos.confidence,
+                        "arguments": pos.arguments,
+                        "challenged": pos.challenged,
+                        "challenge_reason": pos.challenge_reason,
+                    }
+                if turn.error:
+                    te["error"] = turn.error
+                if turn.tool_calls:
+                    te["tool_calls"] = turn.tool_calls
+                if turn.tool_results:
+                    te["tool_results"] = turn.tool_results
                 yield te
 
             debate.rounds.append(rnd)
@@ -457,6 +617,7 @@ class DebateOrchestrator:
         debate: Debate,
         round_number: int,
         phase: DebatePhase,
+        current_round_turns: Optional[list] = None,
     ) -> Turn:
         """
         Exécute un tour de parole pour un participant.
@@ -493,8 +654,11 @@ class DebateOrchestrator:
                 participant, debate.question, len(debate.participants)
             )
         else:
+            # Within-Round [4] : en mode standard, current_round_turns contient
+            # les turns déjà complétés dans le round courant (same-round visibility)
             messages = self._context_builder.build_debate_messages(
-                participant, debate.question, debate, round_number
+                participant, debate.question, debate, round_number,
+                current_round_turns=current_round_turns,
             )
 
         # Outils disponibles (format OpenAI function calling)

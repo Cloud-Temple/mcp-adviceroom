@@ -42,6 +42,19 @@ class VerdictType(str, Enum):
     ERROR = "error"
 
 
+class DebateMode(str, Enum):
+    """Mode de débat (§3.1.1).
+    
+    Fondé sur les papiers [2] Free-MAD, [4] Debate Protocols, [5] Can LLM Debate.
+    - standard : Cross-Round [4], round-robin séquentiel, max interaction
+    - parallel : Within-Round [4], asyncio.gather par round, 3× plus rapide
+    - blitz    : No-Interaction [4] + Single-round [2], opening + verdict, 10× plus rapide
+    """
+    STANDARD = "standard"
+    PARALLEL = "parallel"
+    BLITZ = "blitz"
+
+
 class ChallengeQuality(str, Enum):
     """Qualité du challenge anti-conformité."""
     SUBSTANTIVE = "substantive"
@@ -143,6 +156,7 @@ class Debate:
     """Un débat complet."""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     question: str = ""
+    mode: DebateMode = DebateMode.PARALLEL  # Mode de débat (§3.1.1)
     status: DebateStatus = DebateStatus.CREATED
     phase: DebatePhase = DebatePhase.OPENING
     participants: List[Participant] = field(default_factory=list)
