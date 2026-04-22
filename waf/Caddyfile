@@ -53,7 +53,12 @@
 		reverse_proxy backend:8000
 	}
 
-	# Frontend
+	# Racine → redirige vers l'admin console
+	handle / {
+		redir / /admin permanent
+	}
+
+	# Frontend (assets React si besoin)
 	handle {
 		reverse_proxy frontend:3000
 	}
