@@ -25,7 +25,7 @@ export default function App() {
             <span className="text-2xl">🏛️</span>
             <h1 className="text-xl font-bold text-gray-800">AdviceRoom</h1>
           </button>
-          <span className="text-sm text-gray-400">v0.1.1 — Débats Multi-LLM</span>
+          <span className="text-sm text-gray-400">v0.1.2 — Débats Multi-LLM</span>
         </div>
       </header>
 

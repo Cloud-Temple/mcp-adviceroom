@@ -5,6 +5,19 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [0.1.2] — 2026-04-22
+
+### Corrigé
+
+- **Token Store S3 — bug critique** : les tokens étaient écrasés à chaque création (seul le dernier persistait)
+  - Cause racine : boto3 SigV4 par défaut → `XAmzContentSHA256Mismatch` sur Dell ECS — aucun token n'était sauvé sur S3
+  - Fix : `BotoConfig(signature_version="s3")` — SigV2 legacy compatible Dell ECS (même pattern que `s3_store.py`)
+  - Fix : `self.load()` avant `create()` et `revoke()` — pattern read-modify-write pour éviter l'écrasement
+- **Redirection `/` → `/admin`** : la racine du WAF affichait l'ancien frontend React obsolète — redirige maintenant vers l'admin console (301 permanent)
+- **Nettoyage git** : `.clinerules/` retiré du tracking, `.DS_Store` dédupliqué dans `.gitignore`
+
+---
+
 ## [0.1.1] — 2026-04-22
 
 ### Corrigé
