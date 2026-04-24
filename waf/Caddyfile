@@ -18,6 +18,7 @@
 		load_owasp_crs
 		directives `
 			Include /etc/caddy/crs/crs-setup.conf
+			SecAction "id:999999,phase:1,nolog,pass,t:none,setvar:'tx.allowed_methods=GET HEAD POST OPTIONS DELETE PUT PATCH'"
 			Include /etc/caddy/crs/rules/*.conf
 			SecRuleEngine On
 			SecRequestBodyAccess On
