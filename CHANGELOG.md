@@ -5,6 +5,16 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [0.1.5] — 2026-04-24
+
+### Corrigé
+
+- **Échappements `\"` dans le rendu** : les guillemets échappés par la sérialisation JSON (`\"conflit majeur\"`) apparaissaient avec des backslashes dans le viewer admin et l'export HTML — nettoyage ajouté dans `md()` et `mdExport()`
+- **Dashboard KPI Round X/Y** : `resetDashState()` écrasait `DM_MAX_ROUNDS=5` après le set utilisateur — inversé l'ordre d'appel
+- **WAF Coraza** (poussé par Christophe) : méthodes `DELETE/PUT/PATCH` autorisées dans OWASP CRS + `flush_interval -1` sur `/api/*` et `/mcp*` pour le streaming NDJSON
+
+---
+
 ## [0.1.4] — 2026-04-24
 
 ### Corrigé
