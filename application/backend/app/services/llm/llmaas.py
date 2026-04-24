@@ -82,7 +82,7 @@ class LLMaaSProvider(BaseLLMProvider):
             payload["max_tokens"] = max_tokens
 
         try:
-            async with httpx.AsyncClient(timeout=180.0) as client:
+            async with httpx.AsyncClient(timeout=660.0) as client:
                 response = await client.post(
                     f"{self.base_url}/v1/chat/completions",
                     headers=self._headers(),
