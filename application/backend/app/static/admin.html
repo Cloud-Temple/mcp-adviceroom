@@ -1581,8 +1581,8 @@ async function startDebate(){
 
         DM_TOKENS=0;
         DM_START_TIME=Date.now();
-        DM_MAX_ROUNDS=maxRounds;
         resetDashState();
+        DM_MAX_ROUNDS=maxRounds;
         DM_TIMER=setInterval(updateDmStats,1000);
 
         // Store debate ID for stop button
@@ -1648,6 +1648,8 @@ function handleLiveEvent(evt,tl,pMap){
     DM_EVENT_COUNT++;
 
     if(t==='debate_start'){
+        // Mettre à jour max_rounds depuis le backend (source de vérité)
+        if(evt.max_rounds) DM_MAX_ROUNDS=evt.max_rounds;
         // Afficher le mode en gros dans le header
         const mode=evt.mode||'parallel';
         const modeStyles={'blitz':'background:rgba(232,93,93,0.2);color:var(--red);border:1px solid rgba(232,93,93,0.4)','parallel':'background:rgba(91,141,239,0.2);color:var(--blue);border:1px solid rgba(91,141,239,0.4)','standard':'background:rgba(232,163,61,0.2);color:var(--orange);border:1px solid rgba(232,163,61,0.4)'};

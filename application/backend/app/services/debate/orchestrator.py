@@ -238,6 +238,7 @@ class DebateOrchestrator:
         yield {"type": "debate_start", "debate_id": debate.id,
                "question": debate.question,
                "mode": debate.mode.value,
+               "max_rounds": self._max_rounds,
                "participants": [self._participant_info(p) for p in debate.participants]}
 
         try:

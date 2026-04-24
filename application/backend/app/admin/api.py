@@ -30,34 +30,29 @@ from ..auth.middleware import get_activity_log
 
 
 async def handle_admin_api(scope, receive, send, mcp):
-    """Routeur principal de l'API admin."""
+    """Routeur principal de l'API admin.
+
+    Niveaux d'accès :
+    - Routes de lecture (health, whoami, models, debates, logs) → tout token authentifié (read)
+    - Routes d'écriture tokens (create, revoke) → admin uniquement
+    - Routes d'écriture débats (delete) → tout token authentifié (write)
+    """
     path = scope.get("path", "")
     method = scope.get("method", "GET")
 
-    # --- Auth admin requise ---
+    # --- Auth : au minimum un token valide ---
     token = _extract_admin_token(scope)
-    if not _is_admin(token):
+    if not _is_authenticated(token):
         return await _json_response(
-            send, 401, {"status": "error", "message": "Admin token required"}
+            send, 401, {"status": "error", "message": "Token required"}
         )
 
-    # --- Routes ---
+    # --- Routes en lecture (tout token authentifié) ---
     if path == "/admin/api/health" and method == "GET":
         return await _api_health(send, mcp)
 
     if path == "/admin/api/whoami" and method == "GET":
         return await _api_whoami(send, token)
-
-    if path == "/admin/api/tokens" and method == "GET":
-        return await _api_list_tokens(send)
-
-    if path == "/admin/api/tokens" and method == "POST":
-        body = await _read_body(receive)
-        return await _api_create_token(send, body)
-
-    if path.startswith("/admin/api/tokens/") and method == "DELETE":
-        hash_prefix = path.split("/")[-1]
-        return await _api_revoke_token(send, hash_prefix)
 
     if path == "/admin/api/logs" and method == "GET":
         return await _api_logs(send)
@@ -78,6 +73,23 @@ async def handle_admin_api(scope, receive, send, mcp):
     if path.startswith("/admin/api/debates/") and method == "DELETE":
         debate_id = path[len("/admin/api/debates/"):]
         return await _api_delete_debate(send, debate_id)
+
+    # --- Routes admin-only (gestion tokens) ---
+    if not _is_admin(token):
+        return await _json_response(
+            send, 403, {"status": "error", "message": "Admin permission required"}
+        )
+
+    if path == "/admin/api/tokens" and method == "GET":
+        return await _api_list_tokens(send)
+
+    if path == "/admin/api/tokens" and method == "POST":
+        body = await _read_body(receive)
+        return await _api_create_token(send, body)
+
+    if path.startswith("/admin/api/tokens/") and method == "DELETE":
+        hash_prefix = path.split("/")[-1]
+        return await _api_revoke_token(send, hash_prefix)
 
     return await _json_response(
         send, 404, {"status": "error", "message": f"Unknown admin route: {path}"}
@@ -548,6 +560,24 @@ def _extract_admin_token(scope) -> str:
     if auth.startswith("Bearer "):
         return auth[7:]
     return ""
+
+
+def _is_authenticated(token: str) -> bool:
+    """Vérifie si le token est valide (bootstrap key ou tout token non-révoqué)."""
+    if not token:
+        return False
+    settings = get_settings()
+    # Bootstrap key = toujours authentifié
+    if hmac.compare_digest(token, settings.admin_bootstrap_key):
+        return True
+    # Token S3 : valide si existe et non-révoqué
+    store = get_token_store()
+    if store:
+        h = hashlib.sha256(token.encode()).hexdigest()
+        info = store.get_by_hash(h)
+        if info and not info.get("revoked"):
+            return True
+    return False
 
 
 def _is_admin(token: str) -> bool:
