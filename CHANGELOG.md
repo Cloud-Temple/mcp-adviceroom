@@ -5,6 +5,18 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [0.1.4] — 2026-04-24
+
+### Corrigé
+
+- **Dashboard KPI "Round X/Y"** : le max affiché (Y) ne correspondait pas au choix de l'utilisateur — l'orchestrator envoie maintenant `max_rounds` dans l'event `debate_start` NDJSON, et le frontend le lit comme source de vérité
+- **Admin inaccessible aux tokens non-admin** : les tokens `read,write` recevaient un 401 sur `/admin/api/*` — séparation des routes en 2 niveaux d'accès :
+  - Routes lecture (health, whoami, models, debates, logs) → tout token authentifié
+  - Routes gestion tokens (create, revoke, list) → admin uniquement
+  - Ajout de `_is_authenticated()` (tout token valide) vs `_is_admin()` (permission admin)
+
+---
+
 ## [0.1.3] — 2026-04-24
 
 ### Corrigé
