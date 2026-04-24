@@ -4,7 +4,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-135%2F135-brightgreen)]()
-[![Version](https://img.shields.io/badge/Version-0.1.2-blue)]()
+[![Version](https://img.shields.io/badge/Version-0.1.3-blue)]()
 
 [🇫🇷 Version française](README.md)
 

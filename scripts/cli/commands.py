@@ -361,7 +361,7 @@ def debate_start_cmd(ctx, question, models, mode, rounds):
 
         # 3. Créer le débat
         console.print("  [dim]Création du débat...[/]")
-        result = await client.create_debate(question, participants, mode=mode)
+        result = await client.create_debate(question, participants, mode=mode, max_rounds=rounds)
         if result.get("status") == "error":
             show_error(result.get("message", "Erreur création"))
             return

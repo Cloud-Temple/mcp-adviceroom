@@ -5,6 +5,19 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [0.1.3] — 2026-04-24
+
+### Corrigé
+
+- **Rounds max ignorés** : le nombre de rounds choisi dans `/admin` était systématiquement plafonné à 3 en mode parallel (et 5 en standard)
+  - Cause racine : `orchestrator.py` bornait le `config_overrides["max_rounds"]` par `min(user_value, mode_cfg.max_rounds)` — le max du mode servait de plafond au lieu de valeur par défaut
+  - Fix : le `max_rounds` du mode est maintenant la valeur par défaut uniquement ; l'utilisateur peut choisir jusqu'à 20 rounds (borne API)
+- **CLI `--rounds` ignoré** : le flag `--rounds` / `-r` de `debate start` était défini mais jamais passé à `create_debate()` — corrigé dans `commands.py`
+- **Shell `--mode` et `--rounds` manquants** : le shell interactif ne parsait ni `--mode` ni `-r` — corrigé dans `shell.py`
+- **Admin UI blitz** : le sélecteur de rounds affichait 3 en mode blitz au lieu de 1 — corrigé + ajout option "1 round"
+
+---
+
 ## [0.1.2] — 2026-04-22
 
 ### Corrigé

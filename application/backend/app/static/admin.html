@@ -646,7 +646,7 @@ input:focus { outline: none; border-color: var(--accent); }
             </div>
             <input type="hidden" id="dc-mode" value="parallel">
             </div>
-            <div><label style="font-size:0.78rem;color:var(--muted)">Rounds max <span class="tip" data-tip="Un round = un tour de table complet. Le débat dure plusieurs rounds.">?</span></label><select id="dc-rounds" style="margin-top:4px"><option value="3" selected>3</option><option value="5">5</option><option value="7">7</option><option value="10">10</option></select></div>
+            <div><label style="font-size:0.78rem;color:var(--muted)">Rounds max <span class="tip" data-tip="Un round = un tour de table complet. Le débat dure plusieurs rounds.">?</span></label><select id="dc-rounds" style="margin-top:4px"><option value="1">1</option><option value="3" selected>3</option><option value="5">5</option><option value="7">7</option><option value="10">10</option></select></div>
             <button class="btn" onclick="startDebate()" id="dc-start-btn" style="padding:9px 24px;font-size:0.88rem">🚀 Lancer le débat</button>
             <button class="btn btn-secondary" onclick="hideNewDebate()">Annuler</button>
         </div>
@@ -1516,7 +1516,7 @@ function selectMode(mode){
     });
     // Adjust rounds default based on mode
     const roundsSel=document.getElementById('dc-rounds');
-    if(mode==='blitz'){roundsSel.value='3';roundsSel.disabled=true}
+    if(mode==='blitz'){roundsSel.value='1';roundsSel.disabled=true}
     else{roundsSel.disabled=false;roundsSel.value=mode==='standard'?'5':'3'}
 }
 

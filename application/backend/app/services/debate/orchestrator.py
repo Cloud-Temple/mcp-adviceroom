@@ -202,13 +202,10 @@ class DebateOrchestrator:
         # Attribuer les personas
         self._persona_manager.assign_personas(participants, persona_overrides)
 
-        # Appliquer les surcharges de config (max_rounds borné par le mode)
+        # Appliquer les surcharges de config (max_rounds déjà borné 1-20 par l'API)
         if config_overrides:
             if "max_rounds" in config_overrides:
-                self._max_rounds = min(
-                    config_overrides["max_rounds"],
-                    mode_cfg.get("max_rounds", 5),
-                )
+                self._max_rounds = max(int(config_overrides["max_rounds"]), 1)
 
         debate = Debate(
             question=question,

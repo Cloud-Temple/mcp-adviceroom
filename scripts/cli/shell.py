@@ -208,7 +208,7 @@ async def cmd_debate(client: AdminClient, args: str = "", json_output: bool = Fa
 
 async def _debate_start_shell(client: AdminClient, args: str):
     """Lancer un débat depuis le shell interactif."""
-    # Parser simple : debate start "question" [-m model1,model2]
+    # Parser : debate start "question" [-m model1,model2] [--mode parallel] [-r 5]
     import shlex
     try:
         tokens = shlex.split(args)
@@ -216,15 +216,26 @@ async def _debate_start_shell(client: AdminClient, args: str):
         tokens = args.split()
 
     if not tokens:
-        show_warning('Usage: debate start "Ma question" [-m gpt-52,claude-opus-46]')
+        show_warning('Usage: debate start "Ma question" [-m models] [--mode standard|parallel|blitz] [-r rounds]')
         return
 
     question = tokens[0]
     model_ids_str = ""
+    mode = None
+    max_rounds = None
     i = 1
     while i < len(tokens):
         if tokens[i] in ("-m", "--models") and i + 1 < len(tokens):
             model_ids_str = tokens[i + 1]
+            i += 2
+        elif tokens[i] == "--mode" and i + 1 < len(tokens):
+            mode = tokens[i + 1]
+            i += 2
+        elif tokens[i] in ("-r", "--rounds") and i + 1 < len(tokens):
+            try:
+                max_rounds = int(tokens[i + 1])
+            except ValueError:
+                pass
             i += 2
         else:
             i += 1
@@ -265,7 +276,7 @@ async def _debate_start_shell(client: AdminClient, args: str):
 
     # Créer et streamer
     console.print(f"  [dim]Création du débat...[/]")
-    result = await client.create_debate(question, participants)
+    result = await client.create_debate(question, participants, mode=mode, max_rounds=max_rounds)
     if result.get("status") == "error":
         show_error(result.get("message", "Erreur"))
         return
