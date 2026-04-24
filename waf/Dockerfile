@@ -28,6 +28,7 @@ RUN apk add --no-cache wget && \
     mkdir -p /etc/caddy/crs && \
     mv coreruleset-4.8.0/* /etc/caddy/crs/ && \
     cp /etc/caddy/crs/crs-setup.conf.example /etc/caddy/crs/crs-setup.conf && \
+    sed -i 's/tx.allowed_methods=GET HEAD POST OPTIONS/tx.allowed_methods=GET HEAD POST OPTIONS PUT DELETE PATCH/' /etc/caddy/crs/crs-setup.conf && \
     rm -rf coreruleset-4.8.0-minimal.tar.gz coreruleset-4.8.0 && \
     apk del wget
 
