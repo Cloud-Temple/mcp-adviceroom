@@ -80,20 +80,51 @@ def _sanitize_yaml_block(raw: str) -> str:
     - Markdown bold (ex: '- **Compatibilité** du système')
     - Listes numérotées (ex: '1. **texte**' interprété comme clé YAML)
     - Tabs dans l'indentation (interdit en YAML)
+    - Block scalars (| ou >) : le contenu ne doit PAS être sanitisé ligne à ligne
 
     Solution : pour chaque ligne, si la valeur/contenu contient des
     caractères problématiques et n'est pas déjà quoté, on wrappe
-    avec des guillemets doubles.
+    avec des guillemets doubles. Les blocs scalaires (| >) sont détectés
+    et leur contenu est passé tel quel.
     """
     # Pré-traitement : tabs → 2 espaces (YAML n'accepte pas les tabs)
     raw = raw.replace('\t', '  ')
 
     lines = raw.split('\n')
     fixed = []
+    in_block_scalar = False   # True quand on est dans un bloc | ou >
+    block_scalar_indent = -1  # Indentation de la clé qui ouvre le bloc
+
     for line in lines:
         stripped = line.strip()
+
+        # --- Gestion des block scalars (| et >) ---
+        if in_block_scalar:
+            if stripped:
+                current_indent = len(line) - len(line.lstrip())
+                if current_indent <= block_scalar_indent:
+                    # Sortie du bloc scalaire : traiter cette ligne normalement
+                    in_block_scalar = False
+                    # Fall-through vers le traitement normal ci-dessous
+                else:
+                    # Intérieur du bloc : passer tel quel
+                    fixed.append(line)
+                    continue
+            else:
+                # Ligne vide dans un bloc : conserver
+                fixed.append(line)
+                continue
+
         # Skip empty lines and comments
         if not stripped or stripped.startswith('#'):
+            fixed.append(line)
+            continue
+
+        # Détecter l'ouverture d'un block scalar : "key: |" ou "key: >"
+        bs_match = re.match(r'^(\s*)([\w.-]+)\s*:\s*[|>][+-]?\s*$', line)
+        if bs_match:
+            in_block_scalar = True
+            block_scalar_indent = len(bs_match.group(1))
             fixed.append(line)
             continue
 
@@ -366,12 +397,26 @@ def _fallback_extract_verdict_from_block(raw: str, prose: str) -> Tuple[str, Dic
     )
     conf_m = re.search(r'confidence\s*:\s*(\d+)', raw, re.IGNORECASE)
 
+    # Tenter d'extraire le vrai summary depuis le bloc brut
+    # Cherche "summary: ..." jusqu'à la prochaine clé YAML ou fin de bloc
+    summary_m = re.search(
+        r'summary\s*:\s*[|>]?\s*\n?\s*(.+?)(?=\n\s*\w[\w.-]*\s*:|\Z)',
+        raw, re.DOTALL | re.IGNORECASE,
+    )
+    if summary_m:
+        summary = summary_m.group(1).strip()
+    elif prose:
+        # Utiliser le texte libre avant le bloc VERDICT comme summary
+        summary = prose
+    else:
+        summary = "Synthèse non disponible (YAML invalide dans le bloc)."
+
     if verdict_m:
         logger.info("⚡ Verdict extrait par fallback regex (bloc YAML invalide)")
         return prose, {
             "verdict": verdict_m.group(1).lower(),
             "confidence": int(conf_m.group(1)) if conf_m else 50,
-            "summary": "Extrait par fallback (YAML invalide dans le bloc).",
+            "summary": summary,
         }
 
     return prose, {"verdict": "error", "confidence": 0, "summary": "YAML invalide dans le bloc VERDICT."}
