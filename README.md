@@ -4,7 +4,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-135%2F135-brightgreen)]()
-[![Version](https://img.shields.io/badge/Version-0.1.5-blue)]()
+[![Version](https://img.shields.io/badge/Version-0.1.6-blue)]()
 
 [🇬🇧 English version](README.en.md)
 
@@ -214,7 +214,7 @@ mcp-adviceroom/
 │   │   │   ├── routers/   # REST API (debates, providers)
 │   │   │   ├── services/  # Debate engine, LLM providers, S3 storage, MCP Tools
 │   │   │   └── static/    # Admin SPA (admin.html)
-│   │   └── tests/         # 135 tests (pytest)
+│   │   └── tests/         # 140 tests (pytest)
 │   └── frontend/          # React 18 + Vite + Tailwind
 ├── scripts/
 │   ├── adviceroom_cli.py  # Point d'entrée CLI

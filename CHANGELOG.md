@@ -5,6 +5,22 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [0.1.6] — 2026-04-25
+
+### Amélioré
+
+- **Parser YAML — Support block scalars** (v0.1.5 déployé, intégré ici) : `_sanitize_yaml_block()` détecte les indicateurs `|` et `>` et préserve le contenu littéral — résout le bug "Extrait par fallback (YAML invalide dans le bloc)" sur les verdicts contenant des `:` ou `[]` dans les champs `summary:` et `recommendation:`
+- **Fallback verdict enrichi** : quand `yaml.safe_load` échoue malgré la sanitization, `_fallback_extract_verdict_from_block()` extrait maintenant **tous les champs** par regex (summary, agreement_points, key_insights, recommendation, unresolved_questions) au lieu de seulement verdict + confidence
+- **Logging diagnostique** : le bloc YAML brut (tronqué à 500 chars) est maintenant loggé quand le parsing échoue, facilitant le débogage futur
+
+### Ajouté
+
+- **2 tests parser** (+2 tests, 140 total) :
+  - `test_verdict_with_block_scalar_summary` : vérifie que `summary: |` avec `:` et `[]` est parsé correctement par YAML
+  - `test_verdict_yaml_invalid_fallback_extracts_real_summary` : vérifie que le fallback enrichi extrait le vrai summary + toutes les listes quand le YAML est invalide
+
+---
+
 ## [0.1.5] — 2026-04-24
 
 ### Corrigé

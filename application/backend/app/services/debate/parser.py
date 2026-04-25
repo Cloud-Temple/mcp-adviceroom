@@ -355,9 +355,13 @@ def parse_verdict(text: str) -> Tuple[str, Dict[str, Any]]:
         if not isinstance(data, dict):
             raise ValueError("Le bloc VERDICT n'est pas un dict YAML valide")
     except Exception as e:
-        logger.warning(f"⚠ Erreur parsing YAML du bloc VERDICT : {e}")
-        # Fallback regex sur le contenu brut du bloc
-        return _fallback_extract_verdict_from_block(match.group(1), prose)
+        raw_block = match.group(1)
+        logger.warning(
+            f"⚠ Erreur parsing YAML du bloc VERDICT : {e}\n"
+            f"  Bloc brut (tronqué 500 chars) : {raw_block[:500]}"
+        )
+        # Fallback regex enrichi sur le contenu brut du bloc
+        return _fallback_extract_verdict_from_block(raw_block, prose)
 
     return prose, data
 
@@ -390,36 +394,91 @@ def _fallback_extract_verdict(text: str) -> Tuple[str, Dict[str, Any]]:
 
 
 def _fallback_extract_verdict_from_block(raw: str, prose: str) -> Tuple[str, Dict[str, Any]]:
-    """Fallback verdict depuis le contenu brut du bloc ---VERDICT---."""
+    """
+    Fallback enrichi depuis le contenu brut du bloc ---VERDICT---.
+
+    Quand yaml.safe_load échoue, on extrait le maximum de champs via regex :
+    - verdict (type), confidence, summary
+    - agreement_points, key_insights, unresolved_questions (listes)
+    - recommendation (block scalar ou inline)
+    """
     verdict_m = re.search(
         r'verdict\s*:\s*(consensus|consensus_partiel|dissensus)',
         raw, re.IGNORECASE,
     )
     conf_m = re.search(r'confidence\s*:\s*(\d+)', raw, re.IGNORECASE)
 
-    # Tenter d'extraire le vrai summary depuis le bloc brut
-    # Cherche "summary: ..." jusqu'à la prochaine clé YAML ou fin de bloc
+    if not verdict_m:
+        return prose, {
+            "verdict": "error",
+            "confidence": 0,
+            "summary": "YAML invalide dans le bloc VERDICT.",
+        }
+
+    logger.info("⚡ Verdict extrait par fallback enrichi (bloc YAML invalide)")
+
+    result: Dict[str, Any] = {
+        "verdict": verdict_m.group(1).lower(),
+        "confidence": int(conf_m.group(1)) if conf_m else 50,
+    }
+
+    # --- Extraire summary (block scalar ou inline) ---
     summary_m = re.search(
         r'summary\s*:\s*[|>]?\s*\n?\s*(.+?)(?=\n\s*\w[\w.-]*\s*:|\Z)',
         raw, re.DOTALL | re.IGNORECASE,
     )
     if summary_m:
-        summary = summary_m.group(1).strip()
+        result["summary"] = summary_m.group(1).strip()
     elif prose:
-        # Utiliser le texte libre avant le bloc VERDICT comme summary
-        summary = prose
+        result["summary"] = prose
     else:
-        summary = "Synthèse non disponible (YAML invalide dans le bloc)."
+        result["summary"] = "Synthèse non disponible (YAML invalide dans le bloc)."
 
-    if verdict_m:
-        logger.info("⚡ Verdict extrait par fallback regex (bloc YAML invalide)")
-        return prose, {
-            "verdict": verdict_m.group(1).lower(),
-            "confidence": int(conf_m.group(1)) if conf_m else 50,
-            "summary": summary,
-        }
+    # --- Extraire les listes simples par regex ---
+    result["agreement_points"] = _extract_yaml_list(raw, "agreement_points")
+    result["key_insights"] = _extract_yaml_list(raw, "key_insights")
+    result["unresolved_questions"] = _extract_yaml_list(raw, "unresolved_questions")
 
-    return prose, {"verdict": "error", "confidence": 0, "summary": "YAML invalide dans le bloc VERDICT."}
+    # --- Extraire recommendation (block scalar ou inline) ---
+    rec_m = re.search(
+        r'recommendation\s*:\s*[|>]?\s*\n((?:\s+.+\n?)+)',
+        raw, re.IGNORECASE,
+    )
+    if rec_m:
+        rec_lines = rec_m.group(1).split('\n')
+        result["recommendation"] = '\n'.join(l.strip() for l in rec_lines if l.strip())
+    else:
+        rec_inline = re.search(
+            r'recommendation\s*:\s*"?([^"\n]+)"?\s*$',
+            raw, re.MULTILINE | re.IGNORECASE,
+        )
+        result["recommendation"] = rec_inline.group(1).strip() if rec_inline else ""
+
+    return prose, result
+
+
+def _extract_yaml_list(raw: str, key: str) -> list:
+    """
+    Extrait une liste YAML par regex depuis un bloc brut.
+
+    Cherche 'key:\\n- item1\\n- item2...' et retourne la liste des items.
+    """
+    pattern = re.compile(
+        rf'{key}\s*:\s*\n((?:\s*-\s+.+\n?)+)',
+        re.IGNORECASE,
+    )
+    m = pattern.search(raw)
+    if not m:
+        return []
+
+    items = []
+    for line in m.group(1).split('\n'):
+        item_m = re.match(r'\s*-\s+(.+)', line)
+        if item_m:
+            item_text = item_m.group(1).strip().strip('"').strip("'")
+            if item_text:
+                items.append(item_text)
+    return items
 
 
 # ============================================================

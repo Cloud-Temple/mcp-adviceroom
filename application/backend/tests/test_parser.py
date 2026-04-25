@@ -183,6 +183,79 @@ divergence_points:
         assert verdict["verdict"] == "dissensus"
         assert len(verdict["divergence_points"]) == 1
 
+    def test_verdict_with_block_scalar_summary(self):
+        """Verdict avec summary en block scalar |, contenant : et [] → correctement parsé."""
+        text = """
+Analyse complète du débat.
+
+---VERDICT---
+verdict: consensus
+confidence: 88
+summary: |
+  Les participants convergent sur le fait que: les LLMs transformeront l'industrie.
+  Le marché [SaaS] va se transformer en profondeur.
+  L'impact économique sera: significatif mais progressif.
+agreement_points:
+- Le code devient une commodité
+- Les SaaS ne disparaîtront pas
+key_insights:
+- Le paradoxe de Jevons s'applique au développement logiciel
+recommendation: |
+  Investir dans la formation: pensée systémique et audit de code IA.
+  Ne pas prendre de décisions irréversibles.
+unresolved_questions:
+- Comment adapter les cursus universitaires?
+---END---
+"""
+        prose, verdict = parse_verdict(text)
+        assert "Analyse complète" in prose
+        assert verdict["verdict"] == "consensus"
+        assert verdict["confidence"] == 88
+        # Le summary doit contenir le vrai texte, pas un message hardcodé
+        assert "convergent" in verdict["summary"]
+        assert "LLMs" in verdict["summary"]
+        # Les sous-champs après le block scalar doivent être parsés
+        assert len(verdict["agreement_points"]) == 2
+        assert "commodité" in verdict["agreement_points"][0]
+        assert len(verdict.get("key_insights", [])) >= 1
+        assert len(verdict.get("unresolved_questions", [])) >= 1
+
+    def test_verdict_yaml_invalid_fallback_extracts_real_summary(self):
+        """Quand le YAML échoue, le fallback doit extraire le vrai summary, pas un message hardcodé."""
+        # Ce bloc a du YAML volontairement invalide (mélange de structures)
+        # mais contient quand même summary, agreement_points, etc. lisibles par regex
+        text = """
+---VERDICT---
+verdict: consensus_partiel
+confidence: 72
+summary: |
+  Les experts s'accordent partiellement sur l'impact des LLMs.
+  Cependant, des divergences persistent sur l'ampleur du changement.
+agreement_points:
+- Les SaaS vont évoluer vers des modèles AI-native
+- Le rôle des développeurs va changer fondamentalement
+divergence_points:
+- {{topic: invalid yaml with braces that breaks parsing}}
+key_insights:
+- Le vrai danger est la perte de compétences fondamentales
+recommendation: |
+  Adopter une approche prudente et progressive.
+unresolved_questions:
+- Quel sera l'impact sur les salaires des développeurs?
+---END---
+"""
+        prose, verdict = parse_verdict(text)
+        assert verdict["verdict"] == "consensus_partiel"
+        assert verdict["confidence"] == 72
+        # Le summary ne doit PAS être "Extrait par fallback (YAML invalide...)"
+        assert "experts s'accordent" in verdict["summary"]
+        # Le fallback enrichi doit extraire les listes
+        assert len(verdict.get("agreement_points", [])) >= 2
+        assert len(verdict.get("key_insights", [])) >= 1
+        assert len(verdict.get("unresolved_questions", [])) >= 1
+        # La recommendation doit être extraite
+        assert "prudente" in verdict.get("recommendation", "")
+
     def test_no_verdict_block(self):
         """Pas de bloc ---VERDICT--- → verdict error."""
         text = "Juste du texte."
