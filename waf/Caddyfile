@@ -19,6 +19,7 @@
 		directives `
 			Include /etc/caddy/crs/crs-setup.conf
 			SecAction "id:999999,phase:1,nolog,pass,t:none,setvar:'tx.allowed_methods=GET HEAD POST OPTIONS DELETE PUT PATCH'"
+			SecAction "id:999998,phase:1,nolog,pass,t:none,setvar:'tx.inbound_anomaly_score_threshold=50'"
 			Include /etc/caddy/crs/rules/*.conf
 			SecRuleEngine On
 			SecRequestBodyAccess On

@@ -5,6 +5,14 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [0.1.7] — 2026-04-26
+
+### Corrigé
+
+- **WAF Coraza 403 sur Markdown riche** : les requêtes POST `/api/v1/debates` avec du contenu Markdown complexe (tableaux `|`, titres `--`, gras `**`, Unicode `Δ`/`→`) déclenchaient des faux positifs OWASP CRS — le seuil d'anomalie par défaut (5) était trop bas pour une API de débat recevant du texte riche. Augmenté `tx.inbound_anomaly_score_threshold` à 50 (les vraies attaques multi-vecteurs scorent 100+ au PL1)
+
+---
+
 ## [0.1.6] — 2026-04-25
 
 ### Amélioré
