@@ -27,11 +27,20 @@ export default function useHttpClient() {
       const response = await fetch(`${API_BASE}${path}`, options)
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
+        const text = await response.text()
+        if (!text.trim()) {
+          throw new Error(response.status === 403
+            ? 'Requête bloquée par le WAF (403) — le contenu est peut-être trop riche'
+            : `Réponse vide du serveur (HTTP ${response.status})`)
+        }
+        let data
+        try { data = JSON.parse(text) } catch { data = {} }
         throw new Error(data.detail || `HTTP ${response.status}`)
       }
 
-      return await response.json()
+      const text = await response.text()
+      if (!text.trim()) return {}
+      return JSON.parse(text)
     } catch (err) {
       setError(err.message)
       throw err

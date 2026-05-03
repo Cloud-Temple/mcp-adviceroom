@@ -5,6 +5,15 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [0.1.8] — 2026-05-03
+
+### Corrigé
+
+- **WAF Coraza 403 sur prompts Markdown très riches** : le seuil d'anomalie CRS à 50 (v0.1.7) restait insuffisant pour les prompts complexes type Advice Room (tableaux ~200 `|`, gras `**`, YAML `{}[]`, Unicode, regex) — score cumulé estimé 1300+. Augmenté `tx.inbound_anomaly_score_threshold` à 5000 (les vraies attaques multi-vecteurs en PL1 scorent bien au-delà)
+- **JSON.parse crash sur réponse WAF vide** : quand le WAF retournait un 403 sans body, `resp.json()` crashait avec "unexpected end of data". Ajout d'une gestion robuste des réponses vides dans `admin.html` (startDebate) et `useHttpClient.js` (React hook) avec messages d'erreur explicites
+
+---
+
 ## [0.1.7] — 2026-04-26
 
 ### Corrigé
