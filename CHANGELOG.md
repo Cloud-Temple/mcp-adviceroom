@@ -5,6 +5,14 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [0.1.9] — 2026-05-05
+
+### Corrigé
+
+- **Limite question 50K → 200K caractères** : les prompts Advice Room complexes (papier de recherche complet ~108K chars en annexe + questions structurées + données) dépassaient la limite de 50K. Augmenté `_MAX_QUESTION_LENGTH` à 200 000 dans `debates.py` et `tools.py`. Les modèles modernes (128K-1M tokens de fenêtre de contexte) gèrent sans problème des prompts de cette taille
+
+---
+
 ## [0.1.8] — 2026-05-03
 
 ### Corrigé

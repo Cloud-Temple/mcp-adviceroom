@@ -3,8 +3,8 @@
 > Débats structurés entre LLMs hétérogènes — Serveur MCP + Application Web
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-135%2F135-brightgreen)]()
-[![Version](https://img.shields.io/badge/Version-0.1.8-blue)]()
+[![Tests](https://img.shields.io/badge/Tests-140%2F140-brightgreen)]()
+[![Version](https://img.shields.io/badge/Version-0.1.9-blue)]()
 
 [🇬🇧 English version](README.en.md)
 
@@ -159,19 +159,38 @@ pytest tests/ -v
 
 ## CLI
 
-La CLI est alignée 1:1 avec l'API admin :
+La CLI est alignée 1:1 avec l'API admin. Deux modes d'utilisation : commandes scriptables (Click) et shell interactif.
 
 ```bash
 # Variables d'environnement
 export ADVICEROOM_URL=http://localhost:8000
 export ADVICEROOM_TOKEN=votre-token
 
-# Commandes
+# Commandes de base
 python scripts/adviceroom_cli.py health          # État du serveur
 python scripts/adviceroom_cli.py models          # Modèles LLM disponibles
 python scripts/adviceroom_cli.py debate list     # Lister les débats
 python scripts/adviceroom_cli.py debate start "Votre question" -m gpt-52,claude-opus-46
-python scripts/adviceroom_cli.py shell           # Shell interactif
+
+# Choisir le mode et le nombre de rounds
+python scripts/adviceroom_cli.py debate start "Question" -m gpt-52,claude-opus-46 --mode standard -r 7
+python scripts/adviceroom_cli.py debate start "Question" -m gpt-52,qwen35-27b --mode blitz
+
+# Shell interactif (autocomplétion + aide contextuelle)
+python scripts/adviceroom_cli.py shell
+```
+
+### Options de `debate start`
+
+| Flag | Court | Description | Défaut |
+|------|-------|-------------|--------|
+| `--models` | `-m` | IDs des modèles séparés par des virgules | *(requis)* |
+| `--mode` | | Mode de débat : `standard`, `parallel`, `blitz` | `parallel` |
+| `--rounds` | `-r` | Nombre max de rounds (1-20) | selon le mode |
+
+Les mêmes options sont disponibles dans le shell interactif :
+```
+adviceroom> debate start "Ma question" -m gpt-52,claude-opus-46 --mode standard -r 5
 ```
 
 ## Modèles LLM supportés

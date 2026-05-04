@@ -3,8 +3,8 @@
 > Structured debates between heterogeneous LLMs — MCP Server + Web Application
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-135%2F135-brightgreen)]()
-[![Version](https://img.shields.io/badge/Version-0.1.8-blue)]()
+[![Tests](https://img.shields.io/badge/Tests-140%2F140-brightgreen)]()
+[![Version](https://img.shields.io/badge/Version-0.1.9-blue)]()
 
 [🇫🇷 Version française](README.md)
 
@@ -159,19 +159,38 @@ pytest tests/ -v
 
 ## CLI
 
-The CLI is aligned 1:1 with the admin API:
+The CLI is aligned 1:1 with the admin API. Two usage modes: scriptable commands (Click) and interactive shell.
 
 ```bash
 # Environment variables
 export ADVICEROOM_URL=http://localhost:8000
 export ADVICEROOM_TOKEN=your-token
 
-# Commands
+# Basic commands
 python scripts/adviceroom_cli.py health          # Server status
 python scripts/adviceroom_cli.py models          # Available LLM models
 python scripts/adviceroom_cli.py debate list     # List debates
 python scripts/adviceroom_cli.py debate start "Your question" -m gpt-52,claude-opus-46
-python scripts/adviceroom_cli.py shell           # Interactive shell
+
+# Choose mode and number of rounds
+python scripts/adviceroom_cli.py debate start "Question" -m gpt-52,claude-opus-46 --mode standard -r 7
+python scripts/adviceroom_cli.py debate start "Question" -m gpt-52,qwen35-27b --mode blitz
+
+# Interactive shell (autocompletion + contextual help)
+python scripts/adviceroom_cli.py shell
+```
+
+### `debate start` options
+
+| Flag | Short | Description | Default |
+|------|-------|-------------|---------|
+| `--models` | `-m` | Model IDs separated by commas | *(required)* |
+| `--mode` | | Debate mode: `standard`, `parallel`, `blitz` | `parallel` |
+| `--rounds` | `-r` | Max number of rounds (1-20) | per mode |
+
+The same options are available in the interactive shell:
+```
+adviceroom> debate start "My question" -m gpt-52,claude-opus-46 --mode standard -r 5
 ```
 
 ## Supported LLM Models
