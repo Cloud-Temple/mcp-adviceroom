@@ -5,6 +5,14 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [0.1.10] — 2026-05-05
+
+### Sécurité
+
+- **Isolation owner étendue aux routes admin** : les endpoints `/admin/api/debates` (list, get, delete) du middleware ASGI admin ne vérifiaient pas l'owner — un token non-admin pouvait voir et supprimer tous les débats via l'interface admin. Corrigé : les 3 fonctions reçoivent le token, résolvent le `client_name` via `_get_token_client_name()` et filtrent par owner. Même logique que les routes REST
+
+---
+
 ## [0.1.9] — 2026-05-05
 
 ### Sécurité
