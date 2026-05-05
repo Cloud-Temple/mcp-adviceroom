@@ -64,15 +64,15 @@ async def handle_admin_api(scope, receive, send, mcp):
         return await _api_list_models(send)
 
     if path == "/admin/api/debates" and method == "GET":
-        return await _api_list_debates(send)
+        return await _api_list_debates(send, token)
 
     if path.startswith("/admin/api/debates/") and method == "GET":
         debate_id = path[len("/admin/api/debates/"):]
-        return await _api_get_debate(send, debate_id)
+        return await _api_get_debate(send, debate_id, token)
 
     if path.startswith("/admin/api/debates/") and method == "DELETE":
         debate_id = path[len("/admin/api/debates/"):]
-        return await _api_delete_debate(send, debate_id)
+        return await _api_delete_debate(send, debate_id, token)
 
     # --- Routes admin-only (gestion tokens) ---
     if not _is_admin(token):
@@ -323,14 +323,19 @@ async def _api_list_models(send):
     })
 
 
-async def _api_list_debates(send):
-    """GET /admin/api/debates — Liste des débats (mémoire + S3) avec métadonnées enrichies."""
+async def _api_list_debates(send, token):
+    """GET /admin/api/debates — Liste des débats (filtrés par propriétaire, admin voit tout)."""
+    is_admin = _is_admin(token)
+    client = _get_token_client_name(token)
     debates = []
 
     # Débats en mémoire
     try:
         from ..routers.debates import _active_debates
         for d in _active_debates.values():
+            # Isolation : non-admin ne voit que ses propres débats
+            if not is_admin and getattr(d, 'owner', '') != client:
+                continue
             debates.append(_summarize_debate_memory(d))
     except Exception:
         pass
@@ -343,20 +348,24 @@ async def _api_list_debates(send):
             memory_ids = {d["id"] for d in debates}
             for s3d in store.list_debates(limit=50):
                 if s3d["id"] not in memory_ids:
-                    # Charger le JSON complet pour extraire les métadonnées
                     full = store.load_debate(s3d["id"])
                     if full:
+                        # Isolation : non-admin ne voit que ses débats
+                        debate_owner = full.get("owner", "")
+                        if not is_admin and debate_owner != client:
+                            continue
                         debates.append(_summarize_debate_dict(full, s3d))
                     else:
-                        # Fallback si le load échoue
-                        debates.append({
-                            "id": s3d["id"],
-                            "question": "",
-                            "status": "unknown",
-                            "source": "s3",
-                            "size": s3d.get("size", 0),
-                            "last_modified": str(s3d.get("last_modified", "")),
-                        })
+                        # Fallback — skip pour non-admin (pas de metadata owner)
+                        if is_admin:
+                            debates.append({
+                                "id": s3d["id"],
+                                "question": "",
+                                "status": "unknown",
+                                "source": "s3",
+                                "size": s3d.get("size", 0),
+                                "last_modified": str(s3d.get("last_modified", "")),
+                            })
     except Exception:
         pass
 
@@ -369,13 +378,22 @@ async def _api_list_debates(send):
     )
 
 
-async def _api_get_debate(send, debate_id):
-    """GET /admin/api/debates/{id} — Détails d'un débat."""
+async def _api_get_debate(send, debate_id, token):
+    """GET /admin/api/debates/{id} — Détails d'un débat (filtré par propriétaire)."""
+    is_admin = _is_admin(token)
+    client = _get_token_client_name(token)
+
     # Chercher en mémoire d'abord
     try:
         from ..routers.debates import _active_debates
         debate = _active_debates.get(debate_id)
         if debate:
+            # Isolation : non-admin ne voit que ses propres débats
+            if not is_admin and getattr(debate, 'owner', '') != client:
+                return await _json_response(
+                    send, 404,
+                    {"status": "error", "message": f"Débat '{debate_id}' non trouvé"},
+                )
             from ..services.storage.serializer import serialize_debate_full
             return await _json_response(
                 send, 200,
@@ -391,6 +409,12 @@ async def _api_get_debate(send, debate_id):
         if store and store.available:
             data = store.load_debate(debate_id)
             if data:
+                # Isolation : non-admin ne voit que ses propres débats
+                if not is_admin and data.get("owner", "") != client:
+                    return await _json_response(
+                        send, 404,
+                        {"status": "error", "message": f"Débat '{debate_id}' non trouvé"},
+                    )
                 return await _json_response(
                     send, 200,
                     {"status": "ok", "source": "s3", "debate": data},
@@ -404,8 +428,38 @@ async def _api_get_debate(send, debate_id):
     )
 
 
-async def _api_delete_debate(send, debate_id):
-    """DELETE /admin/api/debates/{id} — Supprimer un débat (mémoire + S3)."""
+async def _api_delete_debate(send, debate_id, token):
+    """DELETE /admin/api/debates/{id} — Supprimer un débat (propriétaire ou admin)."""
+    is_admin = _is_admin(token)
+    client = _get_token_client_name(token)
+
+    # Vérifier ownership avant suppression
+    try:
+        from ..routers.debates import _active_debates
+        debate = _active_debates.get(debate_id)
+        if debate and not is_admin and getattr(debate, 'owner', '') != client:
+            return await _json_response(
+                send, 404,
+                {"status": "error", "message": f"Débat '{debate_id}' non trouvé"},
+            )
+    except Exception:
+        pass
+
+    if not is_admin:
+        # Vérifier aussi sur S3
+        try:
+            from ..services.storage.s3_store import get_debate_store as _get_store
+            store = _get_store()
+            if store and store.available:
+                data = store.load_debate(debate_id)
+                if data and data.get("owner", "") != client:
+                    return await _json_response(
+                        send, 404,
+                        {"status": "error", "message": f"Débat '{debate_id}' non trouvé"},
+                    )
+        except Exception:
+            pass
+
     deleted_from = []
 
     # Supprimer de la mémoire
@@ -595,6 +649,22 @@ def _is_admin(token: str) -> bool:
         if info and "admin" in info.get("permissions", []) and not info.get("revoked"):
             return True
     return False
+
+
+def _get_token_client_name(token: str) -> str:
+    """Retourne le client_name du token (pour l'isolation multi-tenant)."""
+    if not token:
+        return "anonymous"
+    settings = get_settings()
+    if hmac.compare_digest(token, settings.admin_bootstrap_key):
+        return "admin"
+    store = get_token_store()
+    if store:
+        h = hashlib.sha256(token.encode()).hexdigest()
+        info = store.get_by_hash(h)
+        if info:
+            return info.get("client_name", "anonymous")
+    return "anonymous"
 
 
 # V1-08 : limite taille body (1 MB)
