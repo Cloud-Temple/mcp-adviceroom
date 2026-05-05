@@ -30,7 +30,7 @@ AdviceRoom orchestrates **structured debates between heterogeneous LLMs**. Users
 | 🎭     | **Personas**            | 5 roles (Pragmatic, Devil's advocate, Risk analyst…)         |
 | 🔀     | **3 debate modes**      | Standard (Within-Round), Parallel (Cross-Round, default), Blitz (~1 min) |
 | 📊     | **Admin dashboard**     | Live monitoring, confidence/stability charts, HTML export    |
-| 🔒     | **Security**            | Bearer auth, WAF Caddy+Coraza, V1.1 audit (19/22 fixed)      |
+| 🔒     | **Security**            | Bearer auth, owner isolation, WAF Caddy+Coraza, V1.1 audit    |
 
 ## Architecture
 
@@ -206,6 +206,7 @@ adviceroom> debate start "My question" -m gpt-52,claude-opus-46 --mode standard 
 
 ## Security
 
+- **Multi-tenant isolation**: each debate is tied to its creator (`owner`). Non-admin tokens only see their own debates (read = own debates, write = own debates + create, admin = everything). 11 endpoints protected
 - **V1.1 audit**: 22 findings identified, 19 fixed, 2 minor partials, 0 open ([report](DESIGN/SECURITY_AUDIT_V1.md))
 - **Auth**: Bearer Token + ContextVar on all REST and MCP routes
 - **Validation**: UUID regex, length limits, bounds, whitelists
