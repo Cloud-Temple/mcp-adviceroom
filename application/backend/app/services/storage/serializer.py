@@ -44,6 +44,7 @@ def serialize_debate_full(debate: Debate) -> Dict[str, Any]:
     return {
         "id": debate.id,
         "question": debate.question,
+        "owner": debate.owner,
         "mode": debate.mode.value if hasattr(debate.mode, 'value') else str(debate.mode),
         "status": debate.status.value,
         "phase": debate.phase.value,

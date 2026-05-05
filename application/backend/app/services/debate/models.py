@@ -156,6 +156,7 @@ class Debate:
     """Un débat complet."""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     question: str = ""
+    owner: str = ""  # client_name du token créateur (isolation multi-tenant)
     mode: DebateMode = DebateMode.PARALLEL  # Mode de débat (§3.1.1)
     status: DebateStatus = DebateStatus.CREATED
     phase: DebatePhase = DebatePhase.OPENING

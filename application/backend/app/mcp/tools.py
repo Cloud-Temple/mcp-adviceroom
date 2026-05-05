@@ -132,6 +132,10 @@ def register_tools(mcp):
         if len(debate.participants) < 2:
             return {"status": "error", "message": "Au moins 2 participants valides requis."}
 
+        # Enregistrer le propriétaire du débat
+        from ..auth.context import get_current_client_name
+        debate.owner = get_current_client_name()
+
         _active_debates[debate.id] = debate
         _debate_events[debate.id] = asyncio.Queue()
         _debate_events_history[debate.id] = []

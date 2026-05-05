@@ -82,6 +82,34 @@ def get_orchestrator() -> DebateOrchestrator:
 
 
 # ============================================================
+# Helpers d'isolation par propriétaire (multi-tenant)
+# ============================================================
+
+def _is_admin_token(token_info: dict) -> bool:
+    """Vérifie si le token a la permission admin."""
+    return "admin" in token_info.get("permissions", [])
+
+
+def _get_owner_name(token_info: dict) -> str:
+    """Retourne le client_name du token (identifiant propriétaire)."""
+    return token_info.get("client_name", "anonymous")
+
+
+def _require_debate_access(owner: str, token_info: dict) -> None:
+    """
+    Vérifie que le token a accès au débat (propriétaire ou admin).
+
+    Les débats legacy (owner vide) ne sont accessibles qu'aux admins.
+    Retourne 404 (pas 403) pour ne pas révéler l'existence de débats d'autres utilisateurs.
+    """
+    if _is_admin_token(token_info):
+        return
+    client = _get_owner_name(token_info)
+    if not owner or owner != client:
+        raise HTTPException(status_code=404, detail="Débat non trouvé")
+
+
+# ============================================================
 # Pydantic schemas pour l'API (V1-03 : validation renforcée)
 # ============================================================
 
@@ -183,6 +211,9 @@ async def create_debate(
             detail="Au moins 2 participants valides sont requis.",
         )
 
+    # Enregistrer le propriétaire du débat
+    debate.owner = _get_owner_name(_token)
+
     # Stocker le débat et créer la queue d'événements
     _active_debates[debate.id] = debate
     _debate_events[debate.id] = asyncio.Queue()
@@ -259,10 +290,16 @@ async def _run_debate_task(debate_id: str) -> None:
 async def list_active_debates(
     _token: dict = Depends(require_read),  # V1-01
 ):
-    """Liste les débats actuellement en cours d'exécution."""
+    """Liste les débats actuellement en cours d'exécution (filtrés par propriétaire)."""
+    is_admin = _is_admin_token(_token)
+    client = _get_owner_name(_token)
+
     active = []
     for d in _active_debates.values():
         if d.status in (DebateStatus.RUNNING, DebateStatus.PAUSED):
+            # Isolation : non-admin ne voit que ses propres débats
+            if not is_admin and d.owner != client:
+                continue
             active.append(_debate_snapshot(d))
 
     return {"active_debates": active, "total": len(active)}
@@ -282,12 +319,14 @@ async def debate_status(
 
     debate = _active_debates.get(debate_id)
     if debate:
+        _require_debate_access(debate.owner, _token)
         return {"status": "ok", "debate": _debate_snapshot(debate)}
 
     store = get_debate_store()
     if store.available:
         data = store.load_debate(debate_id)
         if data:
+            _require_debate_access(data.get("owner", ""), _token)
             return {"status": "ok", "debate": _s3_debate_snapshot(data)}
 
     raise HTTPException(status_code=404, detail="Débat non trouvé")
@@ -305,8 +344,10 @@ async def stream_debate(
     """Stream NDJSON des événements du débat en temps réel."""
     _validate_debate_id(debate_id)  # V1-03
 
-    if debate_id not in _debate_events:
+    debate = _active_debates.get(debate_id)
+    if not debate or debate_id not in _debate_events:
         raise HTTPException(status_code=404, detail="Débat non trouvé")
+    _require_debate_access(debate.owner, _token)
 
     return StreamingResponse(
         _event_generator(debate_id),
@@ -341,12 +382,14 @@ async def get_debate(
 
     debate = _active_debates.get(debate_id)
     if debate:
+        _require_debate_access(debate.owner, _token)
         return serialize_debate_full(debate)
 
     store = get_debate_store()
     if store.available:
         data = store.load_debate(debate_id)
         if data:
+            _require_debate_access(data.get("owner", ""), _token)
             return data
 
     raise HTTPException(status_code=404, detail="Débat non trouvé")
@@ -374,10 +417,13 @@ async def export_debate(
 
     debate = _active_debates.get(debate_id)
     if debate:
+        _require_debate_access(debate.owner, _token)
         debate_dict = serialize_debate_full(debate)
     else:
         store = get_debate_store()
         debate_dict = store.load_debate(debate_id) if store.available else None
+        if debate_dict:
+            _require_debate_access(debate_dict.get("owner", ""), _token)
 
     if not debate_dict:
         raise HTTPException(status_code=404, detail="Débat non trouvé")
@@ -407,11 +453,16 @@ async def export_debate(
 async def list_debates(
     _token: dict = Depends(require_read),  # V1-01
 ):
-    """Liste tous les débats (mémoire locale + S3)."""
+    """Liste les débats de l'utilisateur (mémoire locale + S3). Admin voit tout."""
+    is_admin = _is_admin_token(_token)
+    client = _get_owner_name(_token)
     debates = []
 
     memory_ids = set()
     for d in _active_debates.values():
+        # Isolation : non-admin ne voit que ses propres débats
+        if not is_admin and d.owner != client:
+            continue
         memory_ids.add(d.id)
         debates.append({
             "id": d.id,
@@ -431,6 +482,10 @@ async def list_debates(
             if s3d["id"] not in memory_ids:
                 full = store.load_debate(s3d["id"])
                 if full:
+                    # Isolation : non-admin ne voit que ses débats + skip legacy sans owner
+                    debate_owner = full.get("owner", "")
+                    if not is_admin and debate_owner != client:
+                        continue
                     debates.append({
                         "id": full["id"],
                         "question": full.get("question", "")[:100],
@@ -456,8 +511,20 @@ async def delete_debate(
     debate_id: str,
     _token: dict = Depends(require_write),  # V1-01
 ):
-    """Supprime un débat (mémoire + S3)."""
+    """Supprime un débat (mémoire + S3). Propriétaire ou admin uniquement."""
     _validate_debate_id(debate_id)  # V1-03
+
+    # Vérifier ownership avant suppression
+    debate = _active_debates.get(debate_id)
+    if debate:
+        _require_debate_access(debate.owner, _token)
+    else:
+        # Vérifier aussi sur S3
+        store = get_debate_store()
+        if store and store.available:
+            data = store.load_debate(debate_id)
+            if data:
+                _require_debate_access(data.get("owner", ""), _token)
 
     deleted_from = []
 
@@ -489,12 +556,13 @@ async def cancel_debate(
     debate_id: str,
     _token: dict = Depends(require_write),  # V1-01
 ):
-    """Arrête un débat en cours."""
+    """Arrête un débat en cours. Propriétaire ou admin uniquement."""
     _validate_debate_id(debate_id)  # V1-03
 
     debate = _active_debates.get(debate_id)
     if not debate:
         raise HTTPException(status_code=404, detail="Débat non trouvé")
+    _require_debate_access(debate.owner, _token)
 
     if debate.status not in (DebateStatus.RUNNING, DebateStatus.PAUSED):
         raise HTTPException(
@@ -518,12 +586,13 @@ async def answer_question(
     request: UserAnswerRequest,
     _token: dict = Depends(require_write),  # V1-01
 ):
-    """Envoie la réponse de l'utilisateur à une question posée par un LLM."""
+    """Envoie la réponse de l'utilisateur à une question posée par un LLM. Propriétaire ou admin."""
     _validate_debate_id(debate_id)  # V1-03
 
     debate = _active_debates.get(debate_id)
     if not debate:
         raise HTTPException(status_code=404, detail="Débat non trouvé")
+    _require_debate_access(debate.owner, _token)
 
     if debate.status != DebateStatus.PAUSED:
         raise HTTPException(

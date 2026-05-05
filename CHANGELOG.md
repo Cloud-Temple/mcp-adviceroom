@@ -7,6 +7,13 @@ versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [0.1.9] — 2026-05-05
 
+### Sécurité
+
+- **Isolation multi-tenant par propriétaire (owner)** : les tokens non-admin ne voient plus que leurs propres débats. Chaque débat enregistre le `client_name` du token créateur comme `owner`. Modèle de permissions : **read** = voit ses débats, **read+write** = voit + lance les siens, **admin** = tout voir/faire. Les débats legacy (sans owner) ne sont accessibles qu'aux admins. Retourne 404 (pas 403) pour ne pas révéler l'existence de débats d'autres utilisateurs
+  - 11 endpoints REST protégés : list, active, status, stream, get, export, create, delete, cancel, answer
+  - Outil MCP `debate_create` : owner enregistré via `get_current_client_name()`
+  - Champ `owner` ajouté au modèle `Debate` et sérialisé dans le JSON S3
+
 ### Corrigé
 
 - **Limite question 50K → 200K caractères** : les prompts Advice Room complexes (papier de recherche complet ~108K chars en annexe + questions structurées + données) dépassaient la limite de 50K. Augmenté `_MAX_QUESTION_LENGTH` à 200 000 dans `debates.py` et `tools.py`. Les modèles modernes (128K-1M tokens de fenêtre de contexte) gèrent sans problème des prompts de cette taille
