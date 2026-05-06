@@ -5,6 +5,18 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [0.1.11] — 2026-06-05
+
+### Corrigé
+
+- **MCP Streamable HTTP 404** : l'endpoint MCP retournait 404 car `FastMCP` monte son handler interne sur `/mcp` par défaut, combiné avec `fastapi_app.mount("/mcp")` cela créait un double chemin `/mcp/mcp`. Fix : `streamable_http_path="/"` dans le constructeur FastMCP. Le rewrite Caddy `/mcp` → `/mcp/` dans le WAF gère aussi le trailing slash requis par Starlette mount
+
+### Ajouté
+
+- **Section MCP (Agents IA) dans README (FR/EN)** : configuration Cline (`cline_mcp_settings.json`), tableau des timeouts recommandés par mode de débat (blitz 600s, parallel 900s, standard 1800s), liste des 6 outils MCP disponibles
+
+---
+
 ## [0.1.10] — 2026-05-05
 
 ### Sécurité

@@ -4,7 +4,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-140%2F140-brightgreen)]()
-[![Version](https://img.shields.io/badge/Version-0.1.10-blue)]()
+[![Version](https://img.shields.io/badge/Version-0.1.11-blue)]()
 
 [🇫🇷 Version française](README.md)
 
@@ -192,6 +192,53 @@ The same options are available in the interactive shell:
 ```
 adviceroom> debate start "My question" -m gpt-52,claude-opus-46 --mode standard -r 5
 ```
+
+## MCP (AI Agents)
+
+AdviceRoom exposes its tools via the **MCP Streamable HTTP** protocol, compatible with MCP clients like [Cline](https://github.com/cline/cline), Claude Desktop, or any AI agent supporting MCP.
+
+### Cline Configuration
+
+In your `cline_mcp_settings.json` file:
+
+```json
+{
+  "mcpServers": {
+    "mcp-advice": {
+      "disabled": false,
+      "timeout": 1800,
+      "type": "streamableHttp",
+      "url": "https://advice.mcp.cloud-temple.app/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_TOKEN"
+      }
+    }
+  }
+}
+```
+
+### Recommended Timeouts
+
+Multi-LLM debates take time — each LLM must respond at each round. The MCP timeout must be adapted to the **debate mode** used:
+
+| Mode | Typical duration | Recommended timeout | Description |
+|------|-----------------|---------------------|-------------|
+| ⚡ **blitz** | 2-5 min | `600` (10 min) | 1 reaction round, quick response |
+| 🔄 **parallel** *(default)* | 3-8 min | `900` (15 min) | Parallel rounds, good trade-off |
+| ⚙️ **standard** | 15-25 min | `1800` (30 min) | Sequential rounds, maximum interaction |
+
+> **💡 Tip:** Use `"timeout": 1800` to cover all modes without having to modify the config. A timeout that is too short (e.g., the default 60s) will cause a client-side error while the debate is running correctly on the server.
+
+### Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `debate_create` | Create a debate (question, models, mode, rounds) |
+| `debate_status` | Track the status of an ongoing debate |
+| `debate_list` | List existing debates |
+| `provider_list` | List available LLM models |
+| `system_health` | Server health status |
+| `system_about` | Server information |
 
 ## Supported LLM Models
 

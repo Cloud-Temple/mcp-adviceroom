@@ -51,6 +51,10 @@
 		}
 	}
 	handle /mcp* {
+		# Rewrite /mcp → /mcp/ (Starlette mount exige le trailing slash,
+		# les clients MCP Streamable HTTP ne suivent pas les 307 POST)
+		@mcp_noslash path /mcp
+		rewrite @mcp_noslash /mcp/
 		reverse_proxy backend:8000 {
 			flush_interval -1
 		}

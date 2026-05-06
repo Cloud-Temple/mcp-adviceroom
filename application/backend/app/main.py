@@ -35,6 +35,9 @@ mcp = FastMCP(
     name="adviceroom",
     host=settings.backend_host,
     port=settings.backend_port,
+    # streamable_http_path="/" évite le double préfixe /mcp/mcp
+    # (le défaut FastMCP est "/mcp", combiné avec mount("/mcp") → /mcp/mcp)
+    streamable_http_path="/",
 )
 
 # Importer les outils MCP (ils s'auto-enregistrent via @mcp.tool())
@@ -62,6 +65,8 @@ fastapi_app.include_router(debates_router, prefix="/api/v1")
 fastapi_app.include_router(providers_router, prefix="/api/v1")
 
 # Monter FastMCP sur /mcp
+# Le streamable_http_path="/" dans le constructeur FastMCP ci-dessus
+# évite le double préfixe /mcp/mcp (le défaut FastMCP est "/mcp")
 fastapi_app.mount("/mcp", mcp.streamable_http_app())
 
 

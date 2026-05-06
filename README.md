@@ -4,7 +4,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-140%2F140-brightgreen)]()
-[![Version](https://img.shields.io/badge/Version-0.1.10-blue)]()
+[![Version](https://img.shields.io/badge/Version-0.1.11-blue)]()
 
 [🇬🇧 English version](README.en.md)
 
@@ -192,6 +192,53 @@ Les mêmes options sont disponibles dans le shell interactif :
 ```
 adviceroom> debate start "Ma question" -m gpt-52,claude-opus-46 --mode standard -r 5
 ```
+
+## MCP (Agents IA)
+
+AdviceRoom expose ses outils via le protocole **MCP Streamable HTTP**, compatible avec les clients MCP comme [Cline](https://github.com/cline/cline), Claude Desktop, ou tout agent IA supportant MCP.
+
+### Configuration Cline
+
+Dans votre fichier `cline_mcp_settings.json` :
+
+```json
+{
+  "mcpServers": {
+    "mcp-advice": {
+      "disabled": false,
+      "timeout": 1800,
+      "type": "streamableHttp",
+      "url": "https://advice.mcp.cloud-temple.app/mcp",
+      "headers": {
+        "Authorization": "Bearer VOTRE_TOKEN"
+      }
+    }
+  }
+}
+```
+
+### Timeouts recommandés
+
+Les débats multi-LLM prennent du temps — chaque LLM doit répondre à chaque round. Le timeout MCP doit être adapté au **mode de débat** utilisé :
+
+| Mode | Durée typique | Timeout recommandé | Description |
+|------|---------------|---------------------|-------------|
+| ⚡ **blitz** | 2-5 min | `600` (10 min) | 1 round de réaction, réponse rapide |
+| 🔄 **parallel** *(défaut)* | 3-8 min | `900` (15 min) | Rounds parallèles, bon compromis |
+| ⚙️ **standard** | 15-25 min | `1800` (30 min) | Rounds séquentiels, interaction maximale |
+
+> **💡 Conseil :** Utilisez `"timeout": 1800` pour couvrir tous les modes sans avoir à modifier la config. Un timeout trop court (ex: 60s par défaut) provoquera une erreur côté client alors que le débat tourne correctement côté serveur.
+
+### Outils MCP disponibles
+
+| Outil | Description |
+|-------|-------------|
+| `debate_create` | Créer un débat (question, modèles, mode, rounds) |
+| `debate_status` | Suivre l'état d'un débat en cours |
+| `debate_list` | Lister les débats existants |
+| `provider_list` | Lister les modèles LLM disponibles |
+| `system_health` | État de santé du serveur |
+| `system_about` | Informations sur le serveur |
 
 ## Modèles LLM supportés
 
