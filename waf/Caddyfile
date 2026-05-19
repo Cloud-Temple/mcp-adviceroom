@@ -63,13 +63,20 @@
 		reverse_proxy backend:8000
 	}
 
-	# Racine → redirige vers l'admin console
+	# SÉCURITÉ : le frontend React n'est PAS exposé publiquement.
+	# L'interface protégée est /admin (SPA admin.html côté backend, auth Bearer).
+	# Le frontend React (port 3000) reste en service pour le docker healthcheck
+	# mais aucune route WAF ne le proxie.
+
+	# Racine → redirige vers l'admin console (protégée par auth Bearer)
 	handle / {
 		redir / /admin permanent
 	}
 
-	# Frontend (assets React si besoin)
+	# SÉCURITÉ : toute URL inconnue retourne une 404 propre.
+	# Plus aucun catch-all vers le frontend — empêche l'exposition de l'UI
+	# (formulaire de création, liste des modèles LLM) sans authentification.
 	handle {
-		reverse_proxy frontend:3000
+		respond "Not Found" 404
 	}
 }

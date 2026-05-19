@@ -5,6 +5,18 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [0.1.12] — 2026-05-19
+
+### Sécurité
+
+- **Fix routage WAF — exposition UI sans authentification** : le handler catch-all `handle { reverse_proxy frontend:3000 }` dans le Caddyfile exposait l'interface de création de débats (formulaire, liste des modèles LLM) sur **toute URL non répertoriée** (ex : `/adm`, `/anything`) **sans aucune authentification**. En cause : nginx (frontend) répond à toutes les routes avec `index.html` (SPA fallback), et l'app React n'utilise pas de router URL. Corrigé en **supprimant totalement l'accès au frontend React depuis le WAF** — plus aucune route ne proxie vers `frontend:3000`. La racine `/` redirige vers `/admin` (SPA admin.html protégée par auth Bearer). Toute autre URL inconnue retourne **404**
+
+### Corrigé
+
+- **Version frontend** : l'en-tête du frontend React affichait `v0.1.5` au lieu de la version courante
+
+---
+
 ## [0.1.11] — 2026-06-05
 
 ### Corrigé
