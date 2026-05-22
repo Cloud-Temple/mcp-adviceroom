@@ -157,6 +157,58 @@ uvicorn app.main:app --reload --port 8000
 pytest tests/ -v
 ```
 
+## Interface Web
+
+L'interface principale d'AdviceRoom est la **console d'administration**, une SPA dark theme Cloud Temple accessible à `/admin`.
+
+### Accès
+
+| Environnement | URL | Notes |
+|---------------|-----|-------|
+| **Production** (WAF) | `https://votre-domaine/admin` | Via WAF Caddy (port 8088) |
+| **Dev local** (WAF) | `http://localhost:8088/admin` | Via WAF |
+| **Dev local** (direct) | `http://localhost:8000/admin` | Bypass WAF (décommenter le port backend dans `docker-compose.yml`) |
+
+> **💡** La racine `/` redirige automatiquement vers `/admin`.
+
+### Authentification
+
+La console requiert un **Bearer token** (le même que pour l'API REST et la CLI). À la première connexion, saisissez votre token dans le formulaire de login.
+
+- **Tokens `read,write`** : accès au dashboard, création/suivi de débats, monitoring
+- **Tokens `admin`** : accès complet incluant la gestion des tokens (création, révocation)
+
+### Fonctionnalités de la console
+
+| Fonctionnalité | Description |
+|----------------|-------------|
+| 🏠 **Dashboard** | Monitoring temps réel des débats en cours (KPIs, graphes confiance/stabilité, timeline) |
+| ➕ **Création de débat** | Formulaire avec sélection des modèles LLM, personas, mode de débat et nombre de rounds |
+| 📋 **Liste des débats** | Historique complet avec statut, mode, durée, nombre de rounds |
+| 🔍 **Viewer détail** | Analyse complète d'un débat (positions, arguments, challenges, verdict, export HTML) |
+| 🔑 **Gestion tokens** | Création et révocation de tokens d'accès (admin uniquement) |
+| 📊 **Activité LLM** | Logs d'activité des appels LLM en temps réel |
+
+> **🔒 Sécurité** : le frontend React (port 3000) n'est **pas exposé** publiquement par le WAF. Seule la console `/admin`, protégée par authentification Bearer, est accessible depuis l'extérieur. Toute URL inconnue retourne une 404.
+
+### API Admin REST
+
+La console utilise une API REST dédiée sous `/admin/api/` :
+
+| Méthode | Route | Auth | Description |
+|---------|-------|------|-------------|
+| GET | `/admin/api/health` | read | État du serveur + LLM Router |
+| GET | `/admin/api/whoami` | read | Identité du token courant |
+| GET | `/admin/api/models` | read | Modèles LLM disponibles |
+| GET | `/admin/api/debates` | read | Liste des débats |
+| GET | `/admin/api/debates/{id}` | read | Détails d'un débat |
+| GET | `/admin/api/logs` | read | Activité récente |
+| GET | `/admin/api/llm-activity` | read | Log activité LLM |
+| POST | `/admin/api/tokens` | admin | Créer un token |
+| GET | `/admin/api/tokens` | admin | Lister les tokens |
+| DELETE | `/admin/api/tokens/{hash}` | admin | Révoquer un token |
+| DELETE | `/admin/api/debates/{id}` | write | Supprimer un débat |
+
 ## CLI
 
 La CLI est alignée 1:1 avec l'API admin. Deux modes d'utilisation : commandes scriptables (Click) et shell interactif.
