@@ -22,10 +22,13 @@ def test_release_version_files_are_in_sync():
     root_version = (ROOT / "VERSION").read_text().strip()
     backend_version = (BACKEND / "VERSION").read_text().strip()
     frontend_pkg = yaml.safe_load((ROOT / "application" / "frontend" / "package.json").read_text())
+    frontend_lock = yaml.safe_load((ROOT / "application" / "frontend" / "package-lock.json").read_text())
 
-    assert root_version == "0.1.13"
+    assert root_version == "0.2.0"
     assert backend_version == root_version
     assert frontend_pkg["version"] == root_version
+    assert frontend_lock["version"] == root_version
+    assert frontend_lock["packages"][""]["version"] == root_version
 
 
 def test_openai_registry_uses_gpt_54_as_default():

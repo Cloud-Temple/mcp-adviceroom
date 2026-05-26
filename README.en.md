@@ -3,8 +3,8 @@
 > Structured debates between heterogeneous LLMs — MCP Server + Web Application
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-140%2F140-brightgreen)]()
-[![Version](https://img.shields.io/badge/Version-0.1.13-blue)]()
+[![Tests](https://img.shields.io/badge/Tests-157%2F157-brightgreen)]()
+[![Version](https://img.shields.io/badge/Version-0.2.0-blue)]()
 
 [🇫🇷 Version française](README.md)
 
