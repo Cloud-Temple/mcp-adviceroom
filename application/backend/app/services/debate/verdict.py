@@ -61,7 +61,7 @@ class VerdictSynthesizer:
 
         # Modèle par défaut et fallback
         self._default_model_id: str = synth_cfg.get("default_model", "claude-opus-46")
-        self._fallback_model_id: str = synth_cfg.get("fallback_model", "gpt-52")
+        self._fallback_model_id: str = synth_cfg.get("fallback_model", "gpt-54")
 
         logger.info(
             f"✓ VerdictSynthesizer chargé : modèle={self._default_model_id}, "

@@ -4,7 +4,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-140%2F140-brightgreen)]()
-[![Version](https://img.shields.io/badge/Version-0.1.11-blue)]()
+[![Version](https://img.shields.io/badge/Version-0.1.13-blue)]()
 
 [🇫🇷 Version française](README.md)
 
@@ -222,11 +222,11 @@ export ADVICEROOM_TOKEN=your-token
 python scripts/adviceroom_cli.py health          # Server status
 python scripts/adviceroom_cli.py models          # Available LLM models
 python scripts/adviceroom_cli.py debate list     # List debates
-python scripts/adviceroom_cli.py debate start "Your question" -m gpt-52,claude-opus-46
+python scripts/adviceroom_cli.py debate start "Your question" -m gpt-54,claude-opus-46
 
 # Choose mode and number of rounds
-python scripts/adviceroom_cli.py debate start "Question" -m gpt-52,claude-opus-46 --mode standard -r 7
-python scripts/adviceroom_cli.py debate start "Question" -m gpt-52,qwen35-27b --mode blitz
+python scripts/adviceroom_cli.py debate start "Question" -m gpt-54,claude-opus-46 --mode standard -r 7
+python scripts/adviceroom_cli.py debate start "Question" -m gpt-54,qwen35-27b --mode blitz
 
 # Interactive shell (autocompletion + contextual help)
 python scripts/adviceroom_cli.py shell
@@ -242,7 +242,7 @@ python scripts/adviceroom_cli.py shell
 
 The same options are available in the interactive shell:
 ```
-adviceroom> debate start "My question" -m gpt-52,claude-opus-46 --mode standard -r 5
+adviceroom> debate start "My question" -m gpt-54,claude-opus-46 --mode standard -r 5
 ```
 
 ## MCP (AI Agents)
@@ -299,7 +299,7 @@ Multi-LLM debates take time — each LLM must respond at each round. The MCP tim
 | LLMaaS (Cloud Temple) | GPT-OSS 120B    | SecNumCloud  | ✅     |
 | LLMaaS (Cloud Temple) | Qwen 3.5 27B    | SecNumCloud  | ✅     |
 | LLMaaS (Cloud Temple) | Gemma 4 31B     | SecNumCloud  | ✅     |
-| OpenAI                | GPT-5.2         | Public cloud | ✅     |
+| OpenAI                | GPT-5.4         | Public cloud | ✅     |
 | Anthropic             | Claude Opus 4-6 | Public cloud | ✅     |
 | Google                | Gemini 3.1 Pro  | Public cloud | ✅     |
 

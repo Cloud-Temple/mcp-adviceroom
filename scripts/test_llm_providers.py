@@ -66,7 +66,7 @@ TESTS = [
     },
     {
         "id": "openai", "name": "OpenAI GPT",
-        "key_env": "OPENAI_API_KEY", "model": "gpt-5.2",
+        "key_env": "OPENAI_API_KEY", "model": "gpt-5.4",
         "provider_cls": "app.services.llm.openai.OpenAIProvider",
     },
     {

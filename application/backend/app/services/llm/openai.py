@@ -6,7 +6,7 @@ OpenAI est le format natif interne d'AdviceRoom → quasi pass-through
 bon format.
 
 Modèles supportés :
-- gpt-5.2 (chat principal, tool calling)
+- gpt-5.4 (chat principal, tool calling)
 
 Ref: DESIGN/architecture.md §5
 """
@@ -42,7 +42,7 @@ class OpenAIProvider(BaseLLMProvider):
         self.base_url = os.getenv(
             "OPENAI_API_URL", "https://api.openai.com/v1"
         ).rstrip("/")
-        self.default_model = os.getenv("OPENAI_DEFAULT_MODEL", "gpt-5.2")
+        self.default_model = os.getenv("OPENAI_DEFAULT_MODEL", "gpt-5.4")
 
     def _headers(self) -> Dict[str, str]:
         """Headers d'authentification OpenAI."""

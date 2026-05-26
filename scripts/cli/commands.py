@@ -9,7 +9,7 @@ Usage :
     python scripts/adviceroom_cli.py health
     python scripts/adviceroom_cli.py models
     python scripts/adviceroom_cli.py debate list
-    python scripts/adviceroom_cli.py debate start "Ma question" -m gpt-52,claude-opus-46
+    python scripts/adviceroom_cli.py debate start "Ma question" -m gpt-54,claude-opus-46
     python scripts/adviceroom_cli.py shell
 """
 

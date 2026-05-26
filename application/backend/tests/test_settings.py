@@ -3,6 +3,14 @@ from pathlib import Path
 from app.config.settings import Settings
 
 
+def _find_project_root() -> Path:
+    candidates = [Path("/workspace"), *Path(__file__).resolve().parents]
+    for candidate in candidates:
+        if (candidate / ".env.example").exists():
+            return candidate
+    raise RuntimeError("Project root not found")
+
+
 def _clear_bootstrap_env(monkeypatch):
     monkeypatch.delenv("ADMIN_BOOTSTRAP_KEY", raising=False)
     monkeypatch.delenv("ADVICEROOM_BOOTSTRAP_KEY", raising=False)
@@ -37,7 +45,7 @@ def test_admin_bootstrap_key_prefers_canonical_env(monkeypatch):
 
 
 def test_env_example_documents_canonical_bootstrap_key():
-    env_example = Path(__file__).parents[3] / ".env.example"
+    env_example = _find_project_root() / ".env.example"
     content = env_example.read_text()
 
     assert "ADMIN_BOOTSTRAP_KEY=" in content

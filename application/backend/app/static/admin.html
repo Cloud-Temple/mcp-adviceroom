@@ -206,8 +206,16 @@ input:focus { outline: none; border-color: var(--accent); }
 .viewer-header { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
 .viewer-back { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 1.2rem; padding: 4px; margin-top: 2px; }
 .viewer-back:hover { color: var(--accent2); }
-.viewer-question { font-size: 1.1rem; font-weight: 700; color: var(--text); line-height: 1.4; flex: 1; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
-.viewer-question.expanded { -webkit-line-clamp: unset; display: block; }
+.viewer-question {
+    font-size: 0.95rem; font-weight: 400; color: var(--text); line-height: 1.55;
+    flex: 1; max-height: min(320px, 45vh); overflow-y: auto; overflow-x: auto;
+    padding: 12px 14px; background: var(--surface); border: 1px solid var(--border);
+    border-left: 3px solid var(--accent); border-radius: 8px; cursor: pointer;
+}
+.viewer-question.expanded { max-height: 70vh; }
+.question-markdown strong { font-weight: 700; }
+.question-markdown em { color: var(--text2); }
+.question-markdown pre { white-space: pre-wrap; }
 
 .viewer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
 @media (max-width: 900px) { .viewer-grid { grid-template-columns: 1fr; } }
@@ -457,12 +465,12 @@ input:focus { outline: none; border-color: var(--accent); }
 }
 .dash-stats .stat-val { font-weight: 700; color: var(--accent2); }
 .dash-question {
-    font-size: 1rem; font-weight: 600; color: var(--text); padding: 12px 16px;
+    font-size: 0.95rem; font-weight: 400; color: var(--text); padding: 12px 16px;
     background: var(--surface); border-radius: 10px; border-left: 3px solid var(--accent);
-    margin-bottom: 16px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
-    overflow: hidden; cursor: pointer;
+    margin-bottom: 16px; max-height: min(220px, 35vh); overflow-y: auto; overflow-x: auto;
+    cursor: pointer; line-height: 1.55;
 }
-.dash-question.expanded { -webkit-line-clamp: unset; display: block; }
+.dash-question.expanded { max-height: 70vh; }
 /* KPI Row */
 .dash-kpis {
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;
@@ -960,16 +968,13 @@ async function loadDashboard(){
 
 /* ===== DEBATES LIST ===== */
 async function loadDebates(){
-    // Si un débat est en cours de monitoring live, restaurer le panneau monitor
-    if(DM_DEBATE_ID && DM_TIMER){
+    const monitorActive = Boolean(DM_DEBATE_ID && DM_TIMER);
+    if(monitorActive){
         document.getElementById('debate-monitor').classList.remove('hidden');
-        document.getElementById('debates-list-view').style.display='none';
-        document.getElementById('debate-viewer').classList.remove('active');
-        return;
+    } else {
+        document.getElementById('debate-monitor').classList.add('hidden');
     }
 
-    // Reset viewer
-    document.getElementById('debate-monitor').classList.add('hidden');
     document.getElementById('debate-viewer').classList.remove('active');
     document.getElementById('debate-viewer').innerHTML='';
     document.getElementById('debates-list-view').style.display='';
@@ -1058,7 +1063,7 @@ async function viewDebate(id){
     <div class="viewer-header">
         <button class="viewer-back" onclick="closeViewer()" title="Retour">← Retour</button>
         <div>
-            <div class="viewer-question" onclick="this.classList.toggle('expanded')" title="Cliquer pour déplier/replier">${esc(db.question)}</div>
+            <div class="viewer-question question-markdown" onclick="this.classList.toggle('expanded')" title="Cliquer pour déplier/replier">${md(db.question)}</div>
             <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
                 <span class="badge badge-info">${db.status}</span>
                 <span style="color:var(--muted);font-size:0.78rem">${fmtDate(db.created_at)}</span>
@@ -1576,9 +1581,9 @@ async function startDebate(){
 
         // Hide create form, show monitor
         hideNewDebate();
-        document.getElementById('debates-list-view').style.display='none';
+        document.getElementById('debates-list-view').style.display='';
         document.getElementById('debate-monitor').classList.remove('hidden');
-        document.getElementById('dm-question').textContent=q;
+        document.getElementById('dm-question').innerHTML=md(q);
         document.getElementById('dm-timeline').innerHTML='';
         document.getElementById('dm-participants').innerHTML='';
         document.getElementById('dm-phase').innerHTML='<span class="badge badge-info">Initialisation…</span>';
@@ -1591,6 +1596,7 @@ async function startDebate(){
 
         // Store debate ID for stop button
         DM_DEBATE_ID=data.debate_id;
+        loadDebates();
 
         // Stream NDJSON events
         monitorDebate(data.debate_id, data.stream_url||`/api/v1/debates/${data.debate_id}/stream`);

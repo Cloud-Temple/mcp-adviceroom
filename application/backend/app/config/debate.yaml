@@ -74,7 +74,7 @@ context:
 # Synthétiseur
 synthesizer:
   default_model: "claude-opus-46" # Modèle par défaut pour le verdict
-  fallback_model: "gpt-52"       # Fallback si le premier échoue
+  fallback_model: "gpt-54"       # Fallback si le premier échoue
 
 # Streaming
 streaming:

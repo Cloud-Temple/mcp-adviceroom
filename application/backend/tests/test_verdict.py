@@ -35,7 +35,7 @@ from app.services.llm.base import LLMResponse, ModelConfig
 MOCK_DEBATE_CONFIG = {
     "synthesizer": {
         "default_model": "claude-opus-46",
-        "fallback_model": "gpt-52",
+        "fallback_model": "gpt-54",
     },
     "context": {
         "sliding_window_rounds": 2,
@@ -283,8 +283,8 @@ class TestVerdictErrors:
 
         # Config avec 2 modèles
         fallback_config = ModelConfig(
-            id="gpt-52", display_name="GPT-5.2", provider="openai",
-            category="openai", api_model_id="gpt-5.2",
+            id="gpt-54", display_name="GPT-5.4", provider="openai",
+            category="openai", api_model_id="gpt-5.4",
         )
 
         mock_router = MagicMock()

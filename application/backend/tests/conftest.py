@@ -114,6 +114,6 @@ def participants_5():
         make_participant("gpt-oss-120b", "llmaas"),
         make_participant("claude-opus-46", "anthropic"),
         make_participant("gemini-31-pro", "google"),
-        make_participant("gpt-52", "openai"),
+        make_participant("gpt-54", "openai"),
         make_participant("qwen35-27b", "llmaas"),
     ]

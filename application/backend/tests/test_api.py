@@ -39,7 +39,7 @@ MOCK_DEBATE_CONFIG = {
         "provider_timeout_seconds": 10, "skip_threshold": 3,
         "min_active_participants": 2,
     },
-    "synthesizer": {"default_model": "claude-opus-46", "fallback_model": "gpt-52"},
+    "synthesizer": {"default_model": "claude-opus-46", "fallback_model": "gpt-54"},
     "context": {"sliding_window_rounds": 2, "summary_tokens_per_participant": 200},
     "streaming": {"chunk_flush_interval_ms": 50},
 }

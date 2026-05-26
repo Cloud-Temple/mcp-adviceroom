@@ -4,7 +4,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-140%2F140-brightgreen)]()
-[![Version](https://img.shields.io/badge/Version-0.1.11-blue)]()
+[![Version](https://img.shields.io/badge/Version-0.1.13-blue)]()
 
 [🇬🇧 English version](README.en.md)
 
@@ -18,19 +18,19 @@ AdviceRoom orchestre des **débats structurés entre LLMs hétérogènes**. L'ut
 
 ## Fonctionnalités
 
-|         | Fonctionnalité           | Description                                                  |
-| ------- | ------------------------ | ------------------------------------------------------------ |
-| 🎯     | **Débats multi-LLM**     | Jusqu'à 5 participants + 1 synthétiseur dédié                |
-| 🛡️   | **Multi-provider**       | LLMaaS SecNumCloud, OpenAI, Anthropic, Google Gemini         |
-| 🔬     | **Protocole académique** | Anti-ancrage, anti-conformité, arrêt adaptatif par stabilité |
-| 🤖     | **Double interface**     | MCP (agents IA) + Web UI (humains)                           |
-| ⚡      | **Streaming temps réel** | NDJSON avec événements granulaires                           |
-| 🧑‍💬 | **User-in-the-loop**     | Les LLMs peuvent poser des questions à l'utilisateur         |
-| 🔧     | **Outils LLM**           | web_search, calculator, datetime via MCP Tools               |
-| 🎭     | **Personas**             | 5 rôles (Pragmatique, Avocat du diable, Analyste risques…)   |
+|         | Fonctionnalité           | Description                                                             |
+| ------- | ------------------------ | ----------------------------------------------------------------------- |
+| 🎯     | **Débats multi-LLM**     | Jusqu'à 5 participants + 1 synthétiseur dédié                           |
+| 🛡️   | **Multi-provider**       | LLMaaS SecNumCloud, OpenAI, Anthropic, Google Gemini                    |
+| 🔬     | **Protocole académique** | Anti-ancrage, anti-conformité, arrêt adaptatif par stabilité            |
+| 🤖     | **Double interface**     | MCP (agents IA) + Web UI (humains)                                      |
+| ⚡      | **Streaming temps réel** | NDJSON avec événements granulaires                                      |
+| 🧑‍💬 | **User-in-the-loop**     | Les LLMs peuvent poser des questions à l'utilisateur                    |
+| 🔧     | **Outils LLM**           | web_search, calculator, datetime via MCP Tools                          |
+| 🎭     | **Personas**             | 5 rôles (Pragmatique, Avocat du diable, Analyste risques…)              |
 | 🔀     | **3 modes de débat**     | Standard (Within-Round), Parallel (Cross-Round, défaut), Blitz (~1 min) |
-| 📊     | **Dashboard admin**      | Monitoring live, graphes confiance/stabilité, export HTML    |
-| 🔒     | **Sécurité**             | Auth Bearer, isolation par owner, WAF Caddy+Coraza, audit V1.1 |
+| 📊     | **Dashboard admin**      | Monitoring live, graphes confiance/stabilité, export HTML               |
+| 🔒     | **Sécurité**             | Auth Bearer, isolation par owner, WAF Caddy+Coraza, audit V1.1          |
 
 ## Architecture
 
@@ -62,15 +62,15 @@ Les LLMs tendent à converger vers la position majoritaire, même quand elle est
 
 ### 7 principes extraits de la recherche
 
-| # | Principe | Mécanisme | Papiers |
-|---|----------|-----------|---------|
-| 1 | **Anti-ancrage** | Positions initiales en parallèle (`asyncio.gather`), pas séquentielles | [[1]](#références) |
-| 2 | **Anti-conformité** | Challenge obligatoire ≥1 argument par round + validation post-tour + retry | [[2]](#références), [[5]](#références) |
-| 3 | **Personas diversifiées** | 5 rôles attribués automatiquement (Pragmatique, Avocat du diable, Analyste risques, Expert technique, Innovateur) | [[7]](#références) |
-| 4 | **Pas de consensus forcé** | Le dissensus structuré est un résultat valide, pas un échec | [[2]](#références), [[6]](#références) |
-| 5 | **Arrêt adaptatif** | 3 métriques de stabilité (position delta, confidence delta, argument novelty) | [[3]](#références) |
-| 6 | **Verdict par trajectoire** | Analyse du débat entier par un synthétiseur dédié, pas du dernier round | [[2]](#références) |
-| 7 | **Outils pour tous** | Chaque LLM a accès aux mêmes outils (web_search, calc, datetime) | [[9]](#références) |
+| #   | Principe                    | Mécanisme                                                                                                         | Papiers                                |
+| --- | --------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| 1   | **Anti-ancrage**            | Positions initiales en parallèle (`asyncio.gather`), pas séquentielles                                            | [[1]](#références)                     |
+| 2   | **Anti-conformité**         | Challenge obligatoire ≥1 argument par round + validation post-tour + retry                                        | [[2]](#références), [[5]](#références) |
+| 3   | **Personas diversifiées**   | 5 rôles attribués automatiquement (Pragmatique, Avocat du diable, Analyste risques, Expert technique, Innovateur) | [[7]](#références)                     |
+| 4   | **Pas de consensus forcé**  | Le dissensus structuré est un résultat valide, pas un échec                                                       | [[2]](#références), [[6]](#références) |
+| 5   | **Arrêt adaptatif**         | 3 métriques de stabilité (position delta, confidence delta, argument novelty)                                     | [[3]](#références)                     |
+| 6   | **Verdict par trajectoire** | Analyse du débat entier par un synthétiseur dédié, pas du dernier round                                           | [[2]](#références)                     |
+| 7   | **Outils pour tous**        | Chaque LLM a accès aux mêmes outils (web_search, calc, datetime)                                                  | [[9]](#références)                     |
 
 ### Protocole en 3 phases
 
@@ -98,25 +98,25 @@ Phase 3: VERDICT (LLM synthétiseur dédié)
 
 ### 3 modes de débat [[4]](#références)
 
-| Mode | Protocole | Visibilité | Durée typique | Usage |
-|------|-----------|------------|---------------|-------|
-| ⚙️ **standard** | Within-Round (WR) | Chaque agent voit les tours **du même round** | 15-25 min | Interaction maximale, peer-referencing |
-| 🔄 **parallel** *(défaut)* | Cross-Round (CR) | Agents ne voient que les **rounds précédents** | 3-8 min | Compromis vitesse/qualité (3× plus rapide) |
-| ⚡ **blitz** | No-Interaction + 1 round | Opening parallèle + 1 round de réaction croisée | 1-2 min | Réponse rapide, exploration initiale |
+| Mode                        | Protocole                | Visibilité                                      | Durée typique | Usage                                      |
+| --------------------------- | ------------------------ | ----------------------------------------------- | ------------- | ------------------------------------------ |
+| ⚙️ **standard**           | Within-Round (WR)        | Chaque agent voit les tours **du même round**   | 15-25 min     | Interaction maximale, peer-referencing     |
+| 🔄 **parallel** *(défaut)* | Cross-Round (CR)         | Agents ne voient que les **rounds précédents**  | 3-8 min       | Compromis vitesse/qualité (3× plus rapide) |
+| ⚡ **blitz**                | No-Interaction + 1 round | Opening parallèle + 1 round de réaction croisée | 1-2 min       | Réponse rapide, exploration initiale       |
 
 ### Références
 
-| # | Papier | Venue | Contribution clé |
-|---|--------|-------|-----------------|
-| [1] | **Multi-LLM Debate: Framework, Principals, and Interventions** — Estornell & Liu | NeurIPS 2024 | Framework bayésien, echo chamber theorem, justifie les LLMs hétérogènes |
-| [2] | **Free-MAD: Consensus-Free Multi-Agent Debate** | arXiv 2509.11035 | Paradigme consensus-free, verdict par trajectoire, anti-conformité |
-| [3] | **Multi-Agent Debate with Adaptive Stability Detection** | arXiv 2510.12697 | Arrêt adaptatif Beta-Binomial + KS test |
-| [4] | **The Impact of Multi-Agent Debate Protocols on Debate Quality** | arXiv 2603.28813 | Comparaison protocoles (WR, CR, RA-CR), trade-off interaction/convergence |
-| [5] | **Can LLM Agents Really Debate?** | arXiv 2511.07784 | Preuve du biais conformiste, défi #1 du débat multi-LLM |
-| [6] | **Consensus-Diversity Trade-off in Adaptive Multi-Agent Systems** | EMNLP 2025 | Le consensus implicite surpasse l'explicite, diversité = robustesse |
-| [7] | **Debate-to-Write: Persona-Driven Multi-Agent Framework** | COLING 2025 | Personas diversifiées maximisent qualité et persuasion des arguments |
-| [8] | **Society of Thought** | arXiv 2601.10825 | Les LLMs simulent déjà un débat interne — valide le concept |
-| [9] | **Tool-MAD: Multi-Agent Debate with Tool Augmentation** | arXiv 2601.04742 | Outils hétérogènes pendant le débat, +5.5% précision fact-checking |
+| #   | Papier                                                                           | Venue            | Contribution clé                                                          |
+| --- | -------------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------- |
+| [1] | **Multi-LLM Debate: Framework, Principals, and Interventions** — Estornell & Liu | NeurIPS 2024     | Framework bayésien, echo chamber theorem, justifie les LLMs hétérogènes   |
+| [2] | **Free-MAD: Consensus-Free Multi-Agent Debate**                                  | arXiv 2509.11035 | Paradigme consensus-free, verdict par trajectoire, anti-conformité        |
+| [3] | **Multi-Agent Debate with Adaptive Stability Detection**                         | arXiv 2510.12697 | Arrêt adaptatif Beta-Binomial + KS test                                   |
+| [4] | **The Impact of Multi-Agent Debate Protocols on Debate Quality**                 | arXiv 2603.28813 | Comparaison protocoles (WR, CR, RA-CR), trade-off interaction/convergence |
+| [5] | **Can LLM Agents Really Debate?**                                                | arXiv 2511.07784 | Preuve du biais conformiste, défi #1 du débat multi-LLM                   |
+| [6] | **Consensus-Diversity Trade-off in Adaptive Multi-Agent Systems**                | EMNLP 2025       | Le consensus implicite surpasse l'explicite, diversité = robustesse       |
+| [7] | **Debate-to-Write: Persona-Driven Multi-Agent Framework**                        | COLING 2025      | Personas diversifiées maximisent qualité et persuasion des arguments      |
+| [8] | **Society of Thought**                                                           | arXiv 2601.10825 | Les LLMs simulent déjà un débat interne — valide le concept               |
+| [9] | **Tool-MAD: Multi-Agent Debate with Tool Augmentation**                          | arXiv 2601.04742 | Outils hétérogènes pendant le débat, +5.5% précision fact-checking        |
 
 > Les papiers sont disponibles dans [`DESIGN/research/`](DESIGN/research/) avec un [index détaillé](DESIGN/research/README.md).
 
@@ -163,10 +163,10 @@ L'interface principale d'AdviceRoom est la **console d'administration**, une SPA
 
 ### Accès
 
-| Environnement | URL | Notes |
-|---------------|-----|-------|
-| **Production** (WAF) | `https://votre-domaine/admin` | Via WAF Caddy (port 8088) |
-| **Dev local** (WAF) | `http://localhost:8088/admin` | Via WAF |
+| Environnement          | URL                           | Notes                                                              |
+| ---------------------- | ----------------------------- | ------------------------------------------------------------------ |
+| **Production** (WAF)   | `https://votre-domaine/admin` | Via WAF Caddy (port 8088)                                          |
+| **Dev local** (WAF)    | `http://localhost:8088/admin` | Via WAF                                                            |
 | **Dev local** (direct) | `http://localhost:8000/admin` | Bypass WAF (décommenter le port backend dans `docker-compose.yml`) |
 
 > **💡** La racine `/` redirige automatiquement vers `/admin`.
@@ -180,14 +180,14 @@ La console requiert un **Bearer token** (le même que pour l'API REST et la CLI)
 
 ### Fonctionnalités de la console
 
-| Fonctionnalité | Description |
-|----------------|-------------|
-| 🏠 **Dashboard** | Monitoring temps réel des débats en cours (KPIs, graphes confiance/stabilité, timeline) |
-| ➕ **Création de débat** | Formulaire avec sélection des modèles LLM, personas, mode de débat et nombre de rounds |
-| 📋 **Liste des débats** | Historique complet avec statut, mode, durée, nombre de rounds |
-| 🔍 **Viewer détail** | Analyse complète d'un débat (positions, arguments, challenges, verdict, export HTML) |
-| 🔑 **Gestion tokens** | Création et révocation de tokens d'accès (admin uniquement) |
-| 📊 **Activité LLM** | Logs d'activité des appels LLM en temps réel |
+| Fonctionnalité           | Description                                                                             |
+| ------------------------ | --------------------------------------------------------------------------------------- |
+| 🏠 **Dashboard**        | Monitoring temps réel des débats en cours (KPIs, graphes confiance/stabilité, timeline) |
+| ➕ **Création de débat** | Formulaire avec sélection des modèles LLM, personas, mode de débat et nombre de rounds  |
+| 📋 **Liste des débats** | Historique complet avec statut, mode, durée, nombre de rounds                           |
+| 🔍 **Viewer détail**    | Analyse complète d'un débat (positions, arguments, challenges, verdict, export HTML)    |
+| 🔑 **Gestion tokens**   | Création et révocation de tokens d'accès (admin uniquement)                             |
+| 📊 **Activité LLM**     | Logs d'activité des appels LLM en temps réel                                            |
 
 > **🔒 Sécurité** : le frontend React (port 3000) n'est **pas exposé** publiquement par le WAF. Seule la console `/admin`, protégée par authentification Bearer, est accessible depuis l'extérieur. Toute URL inconnue retourne une 404.
 
@@ -195,19 +195,19 @@ La console requiert un **Bearer token** (le même que pour l'API REST et la CLI)
 
 La console utilise une API REST dédiée sous `/admin/api/` :
 
-| Méthode | Route | Auth | Description |
-|---------|-------|------|-------------|
-| GET | `/admin/api/health` | read | État du serveur + LLM Router |
-| GET | `/admin/api/whoami` | read | Identité du token courant |
-| GET | `/admin/api/models` | read | Modèles LLM disponibles |
-| GET | `/admin/api/debates` | read | Liste des débats |
-| GET | `/admin/api/debates/{id}` | read | Détails d'un débat |
-| GET | `/admin/api/logs` | read | Activité récente |
-| GET | `/admin/api/llm-activity` | read | Log activité LLM |
-| POST | `/admin/api/tokens` | admin | Créer un token |
-| GET | `/admin/api/tokens` | admin | Lister les tokens |
-| DELETE | `/admin/api/tokens/{hash}` | admin | Révoquer un token |
-| DELETE | `/admin/api/debates/{id}` | write | Supprimer un débat |
+| Méthode | Route                      | Auth  | Description                  |
+| ------- | -------------------------- | ----- | ---------------------------- |
+| GET     | `/admin/api/health`        | read  | État du serveur + LLM Router |
+| GET     | `/admin/api/whoami`        | read  | Identité du token courant    |
+| GET     | `/admin/api/models`        | read  | Modèles LLM disponibles      |
+| GET     | `/admin/api/debates`       | read  | Liste des débats             |
+| GET     | `/admin/api/debates/{id}`  | read  | Détails d'un débat           |
+| GET     | `/admin/api/logs`          | read  | Activité récente             |
+| GET     | `/admin/api/llm-activity`  | read  | Log activité LLM             |
+| POST    | `/admin/api/tokens`        | admin | Créer un token               |
+| GET     | `/admin/api/tokens`        | admin | Lister les tokens            |
+| DELETE  | `/admin/api/tokens/{hash}` | admin | Révoquer un token            |
+| DELETE  | `/admin/api/debates/{id}`  | write | Supprimer un débat           |
 
 ## CLI
 
@@ -222,11 +222,11 @@ export ADVICEROOM_TOKEN=votre-token
 python scripts/adviceroom_cli.py health          # État du serveur
 python scripts/adviceroom_cli.py models          # Modèles LLM disponibles
 python scripts/adviceroom_cli.py debate list     # Lister les débats
-python scripts/adviceroom_cli.py debate start "Votre question" -m gpt-52,claude-opus-46
+python scripts/adviceroom_cli.py debate start "Votre question" -m gpt-54,claude-opus-46
 
 # Choisir le mode et le nombre de rounds
-python scripts/adviceroom_cli.py debate start "Question" -m gpt-52,claude-opus-46 --mode standard -r 7
-python scripts/adviceroom_cli.py debate start "Question" -m gpt-52,qwen35-27b --mode blitz
+python scripts/adviceroom_cli.py debate start "Question" -m gpt-54,claude-opus-46 --mode standard -r 7
+python scripts/adviceroom_cli.py debate start "Question" -m gpt-54,qwen35-27b --mode blitz
 
 # Shell interactif (autocomplétion + aide contextuelle)
 python scripts/adviceroom_cli.py shell
@@ -234,15 +234,15 @@ python scripts/adviceroom_cli.py shell
 
 ### Options de `debate start`
 
-| Flag | Court | Description | Défaut |
-|------|-------|-------------|--------|
-| `--models` | `-m` | IDs des modèles séparés par des virgules | *(requis)* |
-| `--mode` | | Mode de débat : `standard`, `parallel`, `blitz` | `parallel` |
-| `--rounds` | `-r` | Nombre max de rounds (1-20) | selon le mode |
+| Flag       | Court | Description                                     | Défaut        |
+| ---------- | ----- | ----------------------------------------------- | ------------- |
+| `--models` | `-m`  | IDs des modèles séparés par des virgules        | *(requis)*    |
+| `--mode`   |       | Mode de débat : `standard`, `parallel`, `blitz` | `parallel`    |
+| `--rounds` | `-r`  | Nombre max de rounds (1-20)                     | selon le mode |
 
 Les mêmes options sont disponibles dans le shell interactif :
 ```
-adviceroom> debate start "Ma question" -m gpt-52,claude-opus-46 --mode standard -r 5
+adviceroom> debate start "Ma question" -m gpt-54,claude-opus-46 --mode standard -r 5
 ```
 
 ## MCP (Agents IA)
@@ -273,24 +273,24 @@ Dans votre fichier `cline_mcp_settings.json` :
 
 Les débats multi-LLM prennent du temps — chaque LLM doit répondre à chaque round. Le timeout MCP doit être adapté au **mode de débat** utilisé :
 
-| Mode | Durée typique | Timeout recommandé | Description |
-|------|---------------|---------------------|-------------|
-| ⚡ **blitz** | 2-5 min | `600` (10 min) | 1 round de réaction, réponse rapide |
-| 🔄 **parallel** *(défaut)* | 3-8 min | `900` (15 min) | Rounds parallèles, bon compromis |
-| ⚙️ **standard** | 15-25 min | `1800` (30 min) | Rounds séquentiels, interaction maximale |
+| Mode                        | Durée typique | Timeout recommandé | Description                              |
+| --------------------------- | ------------- | ------------------ | ---------------------------------------- |
+| ⚡ **blitz**                | 2-5 min       | `600` (10 min)     | 1 round de réaction, réponse rapide      |
+| 🔄 **parallel** *(défaut)* | 3-8 min       | `900` (15 min)     | Rounds parallèles, bon compromis         |
+| ⚙️ **standard**           | 15-25 min     | `1800` (30 min)    | Rounds séquentiels, interaction maximale |
 
 > **💡 Conseil :** Utilisez `"timeout": 1800` pour couvrir tous les modes sans avoir à modifier la config. Un timeout trop court (ex: 60s par défaut) provoquera une erreur côté client alors que le débat tourne correctement côté serveur.
 
 ### Outils MCP disponibles
 
-| Outil | Description |
-|-------|-------------|
+| Outil           | Description                                      |
+| --------------- | ------------------------------------------------ |
 | `debate_create` | Créer un débat (question, modèles, mode, rounds) |
-| `debate_status` | Suivre l'état d'un débat en cours |
-| `debate_list` | Lister les débats existants |
-| `provider_list` | Lister les modèles LLM disponibles |
-| `system_health` | État de santé du serveur |
-| `system_about` | Informations sur le serveur |
+| `debate_status` | Suivre l'état d'un débat en cours                |
+| `debate_list`   | Lister les débats existants                      |
+| `provider_list` | Lister les modèles LLM disponibles               |
+| `system_health` | État de santé du serveur                         |
+| `system_about`  | Informations sur le serveur                      |
 
 ## Modèles LLM supportés
 
@@ -299,7 +299,7 @@ Les débats multi-LLM prennent du temps — chaque LLM doit répondre à chaque 
 | LLMaaS (Cloud Temple) | GPT-OSS 120B    | SecNumCloud  | ✅     |
 | LLMaaS (Cloud Temple) | Qwen 3.5 27B    | SecNumCloud  | ✅     |
 | LLMaaS (Cloud Temple) | Gemma 4 31B     | SecNumCloud  | ✅     |
-| OpenAI                | GPT-5.2         | Cloud public | ✅     |
+| OpenAI                | GPT-5.4         | Cloud public | ✅     |
 | Anthropic             | Claude Opus 4-6 | Cloud public | ✅     |
 | Google                | Gemini 3.1 Pro  | Cloud public | ✅     |
 

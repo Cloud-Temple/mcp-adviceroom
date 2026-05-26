@@ -66,7 +66,7 @@ class PersonaManager:
 
     Usage :
         manager = PersonaManager()
-        manager.assign_personas(participants, persona_overrides={"gpt-5.2": "expert_technique"})
+        manager.assign_personas(participants, persona_overrides={"gpt-5.4": "expert_technique"})
     """
 
     def __init__(self) -> None:

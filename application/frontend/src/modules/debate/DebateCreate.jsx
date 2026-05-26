@@ -14,7 +14,7 @@ const DEFAULT_MODELS = [
   { provider: 'llmaas', model: 'gpt-oss-120b', label: '🛡️ GPT-OSS 120B (SNC)' },
   { provider: 'llmaas', model: 'qwen35-27b', label: '🛡️ Qwen 3.5 27B (SNC)' },
   { provider: 'llmaas', model: 'gemma4-31b', label: '🛡️ Gemma 4 31B (SNC)' },
-  { provider: 'openai', model: 'gpt-52', label: '🟢 GPT-5.2 (OpenAI)' },
+  { provider: 'openai', model: 'gpt-54', label: '🟢 GPT-5.4 (OpenAI)' },
   { provider: 'anthropic', model: 'claude-opus-46', label: '🟠 Claude Opus 4.6 (Anthropic)' },
   { provider: 'google', model: 'gemini-31-pro', label: '🔵 Gemini 3.1 Pro (Google)' },
 ]

@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     # --- OpenAI ---
     openai_api_key: str = ""
     openai_api_url: str = "https://api.openai.com/v1"
-    openai_default_model: str = "gpt-5.2"
+    openai_default_model: str = "gpt-5.4"
 
     # --- Anthropic ---
     anthropic_api_key: str = ""

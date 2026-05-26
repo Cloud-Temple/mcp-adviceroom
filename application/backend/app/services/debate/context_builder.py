@@ -411,7 +411,7 @@ class ContextBuilder:
         Résume un round ancien en format compact (§16.4).
 
         Chaque participant est résumé en ~1 ligne :
-        "GPT-5.2 : Pour. Conf 80. Args: TCO, scalabilité. Challenge → Claude: risque lock-in."
+        "GPT-5.4 : Pour. Conf 80. Args: TCO, scalabilité. Challenge → Claude: risque lock-in."
 
         Args:
             rnd: Le round à résumer.

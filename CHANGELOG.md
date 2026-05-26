@@ -5,6 +5,21 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [0.1.13] — 2026-05-26
+
+### Corrigé
+
+- **MCP Streamable HTTP** : le lifespan du sous-app FastMCP est maintenant propagé par le parent FastAPI. Corrige le `500 Internal Server Error` avec `RuntimeError: Task group is not initialized` sur `/mcp`
+- **Bootstrap admin** : `.env.example` documente `ADMIN_BOOTSTRAP_KEY`; `ADVICEROOM_BOOTSTRAP_KEY` reste accepté comme alias legacy
+- **Console admin** : pendant un débat en cours, le monitoring live ne masque plus la liste des autres débats
+- **Question de débat** : rendu Markdown activé dans le monitoring live et le viewer détail, avec hauteur bornée et scroll vertical pour les très gros prompts
+
+### Modifié
+
+- **OpenAI** : modèle par défaut et registre LLM mis à jour de GPT-5.2 vers GPT-5.4 (`gpt-54` / `gpt-5.4`)
+
+---
+
 ## [0.1.12] — 2026-05-19
 
 ### Sécurité
