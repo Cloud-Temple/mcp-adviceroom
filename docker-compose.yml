@@ -4,7 +4,7 @@
 # Architecture : WAF → Backend (FastAPI + MCP) + Frontend
 #
 # Le Backend sert à la fois l'API REST (/api/v1/) et le MCP (/mcp).
-# Le WAF (Caddy) fait le reverse proxy HTTP vers backend + frontend.
+# Le WAF (Caddy) fait le reverse proxy HTTP vers le backend.
 # TLS/HTTPS est géré par le reverse proxy de production (nginx/traefik).
 #
 # Services actifs : WAF, Backend, Frontend, Redis (4 services)
@@ -22,7 +22,7 @@ services:
   # ---------------------------------------------------------
   # Route /api/* et /mcp* → backend:8000
   # Route /admin* → backend:8000
-  # Route /* → frontend:3000
+  # Route inconnue → 404. Le frontend React n'est pas exposé publiquement.
   waf:
     build: ./waf
     ports:
@@ -64,6 +64,7 @@ services:
   # Frontend (React + Vite → nginx)
   # ---------------------------------------------------------
   # Build multi-stage : Vite build → nginx sur port 3000
+  # Non exposé par le WAF en production ; conservé pour build/healthcheck.
   frontend:
     build: ./application/frontend
     # V1-17 : port interne uniquement (pas de bypass WAF)

@@ -82,17 +82,11 @@ class AdminClient:
         """GET /admin/api/llm-activity"""
         return await self._get("/admin/api/llm-activity")
 
-    # ── Public API calls (pas d'auth admin requise) ───────────
-
-    async def get_providers(self) -> dict:
-        """GET /api/v1/providers — liste modèles (API publique)."""
-        return await self._get("/api/v1/providers")
-
     async def create_debate(
         self, question: str, participants: list,
         mode: str = None, max_rounds: int = None,
     ) -> dict:
-        """POST /api/v1/debates — créer un débat."""
+        """POST /admin/api/debates — créer un débat."""
         body = {
             "question": question,
             "participants": participants,
@@ -101,14 +95,14 @@ class AdminClient:
             body["mode"] = mode
         if max_rounds:
             body["config"] = {"max_rounds": max_rounds}
-        return await self._post("/api/v1/debates", body)
+        return await self._post("/admin/api/debates", body)
 
     async def stream_debate(self, stream_url: str):
         """
         GET stream NDJSON — yield les événements un par un.
 
         Args:
-            stream_url: chemin relatif (ex: /api/v1/debates/{id}/stream)
+            stream_url: chemin relatif (ex: /admin/api/debates/{id}/stream)
 
         Yields:
             dict — chaque événement NDJSON parsé

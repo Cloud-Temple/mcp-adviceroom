@@ -23,7 +23,7 @@ AdviceRoom orchestrates **structured debates between heterogeneous LLMs**. Users
 | 🎯     | **Multi-LLM debates**   | Up to 5 participants + 1 dedicated synthesizer               |
 | 🛡️   | **Multi-provider**      | LLMaaS SecNumCloud, OpenAI, Anthropic, Google Gemini         |
 | 🔬     | **Academic protocol**   | Anti-anchoring, anti-conformity, adaptive stability stopping |
-| 🤖     | **Dual interface**      | MCP (AI agents) + Web UI (humans)                            |
+| 🤖     | **Dual interface**      | MCP (AI agents) + `/admin` console/CLI (humans)              |
 | ⚡      | **Real-time streaming** | NDJSON with granular events                                  |
 | 🧑‍💬 | **User-in-the-loop**    | LLMs can ask questions to the user mid-debate                |
 | 🔧     | **LLM tools**           | web_search, calculator, datetime via MCP Tools               |
@@ -37,7 +37,8 @@ AdviceRoom orchestrates **structured debates between heterogeneous LLMs**. Users
 ```
 WAF (Caddy + Coraza)
   └── Backend (FastAPI + FastMCP) — Single process
-       ├── REST API /api/v1/     (Web UI, CLI)
+       ├── Admin API /admin/api/ (Web console, CLI)
+       ├── REST API /api/v1/     (REST compatibility/internal MCP)
        ├── MCP /mcp              (AI Agents)
        ├── Admin /admin          (Web console SPA)
        └── Debate Engine
@@ -201,6 +202,9 @@ The console uses a dedicated REST API under `/admin/api/`:
 | GET | `/admin/api/whoami` | read | Current token identity |
 | GET | `/admin/api/models` | read | Available LLM models |
 | GET | `/admin/api/debates` | read | List debates |
+| POST | `/admin/api/debates` | write | Create and start a debate |
+| GET | `/admin/api/debates/{id}/stream` | read | Real-time NDJSON stream |
+| POST | `/admin/api/debates/{id}/cancel` | write | Stop a running debate |
 | GET | `/admin/api/debates/{id}` | read | Debate details |
 | GET | `/admin/api/logs` | read | Recent activity |
 | GET | `/admin/api/llm-activity` | read | LLM activity log |
@@ -211,11 +215,11 @@ The console uses a dedicated REST API under `/admin/api/`:
 
 ## CLI
 
-The CLI is aligned 1:1 with the admin API. Two usage modes: scriptable commands (Click) and interactive shell.
+The CLI is aligned with the `/admin/api/*` admin API, including `debate start` and NDJSON streaming (`/admin/api/debates/{id}/stream`). Two usage modes: scriptable commands (Click) and interactive shell.
 
 ```bash
 # Environment variables
-export ADVICEROOM_URL=http://localhost:8000
+export ADVICEROOM_URL=http://localhost:8088  # Local WAF; http://localhost:8000 for direct backend dev
 export ADVICEROOM_TOKEN=your-token
 
 # Basic commands

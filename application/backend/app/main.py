@@ -101,7 +101,7 @@ def _mcp_lifespan_context():
     return _noop_lifespan(streamable_app)
 
 # =============================================================================
-# FastAPI instance (routes REST pour la web UI + API)
+# FastAPI instance (routes REST de compatibilité + MCP)
 # =============================================================================
 
 _version = "dev"

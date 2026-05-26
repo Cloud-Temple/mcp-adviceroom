@@ -2,7 +2,7 @@
 """
 API REST admin — Endpoints pour la console d'administration AdviceRoom.
 
-Tous les endpoints requièrent un Bearer token admin.
+Tous les endpoints requièrent un Bearer token valide.
 Routage depuis AdminMiddleware pour /admin/api/*.
 
 Endpoints :
@@ -13,7 +13,10 @@ Endpoints :
     DEL  /admin/api/tokens/{hash} → Révoquer un token
     GET  /admin/api/logs          → Activité récente (ring buffer)
     GET  /admin/api/debates       → Liste des débats S3
+    POST /admin/api/debates       → Créer et lancer un débat
     GET  /admin/api/debates/{id}  → Détails d'un débat
+    GET  /admin/api/debates/{id}/stream → Stream NDJSON d'un débat
+    POST /admin/api/debates/{id}/cancel → Arrêter un débat en cours
 
 Pattern adapté du starter-kit Cloud Temple.
 """
@@ -35,7 +38,7 @@ async def handle_admin_api(scope, receive, send, mcp):
     Niveaux d'accès :
     - Routes de lecture (health, whoami, models, debates, logs) → tout token authentifié (read)
     - Routes d'écriture tokens (create, revoke) → admin uniquement
-    - Routes d'écriture débats (delete) → tout token authentifié (write)
+    - Routes d'écriture débats (create, cancel, delete) → permission write
     """
     path = scope.get("path", "")
     method = scope.get("method", "GET")
@@ -66,11 +69,35 @@ async def handle_admin_api(scope, receive, send, mcp):
     if path == "/admin/api/debates" and method == "GET":
         return await _api_list_debates(send, token)
 
+    if path == "/admin/api/debates" and method == "POST":
+        if not _has_permission(token, "write"):
+            return await _json_response(
+                send, 403, {"status": "error", "message": "Write permission required"}
+            )
+        body = await _read_body(receive)
+        return await _api_create_debate(send, body, token)
+
+    if path.startswith("/admin/api/debates/") and path.endswith("/stream") and method == "GET":
+        debate_id = path[len("/admin/api/debates/"):-len("/stream")]
+        return await _api_stream_debate(send, debate_id, token)
+
+    if path.startswith("/admin/api/debates/") and path.endswith("/cancel") and method == "POST":
+        if not _has_permission(token, "write"):
+            return await _json_response(
+                send, 403, {"status": "error", "message": "Write permission required"}
+            )
+        debate_id = path[len("/admin/api/debates/"):-len("/cancel")]
+        return await _api_cancel_debate(send, debate_id, token)
+
     if path.startswith("/admin/api/debates/") and method == "GET":
         debate_id = path[len("/admin/api/debates/"):]
         return await _api_get_debate(send, debate_id, token)
 
     if path.startswith("/admin/api/debates/") and method == "DELETE":
+        if not _has_permission(token, "write"):
+            return await _json_response(
+                send, 403, {"status": "error", "message": "Write permission required"}
+            )
         debate_id = path[len("/admin/api/debates/"):]
         return await _api_delete_debate(send, debate_id, token)
 
@@ -311,6 +338,7 @@ async def _api_list_models(send):
                         "display_name": m.get("display_name", ""),
                         "provider": m.get("provider", ""),
                         "category": cat_name,
+                        "default": m.get("default", False),
                         "active": m.get("active", True),
                     })
     except Exception:
@@ -320,6 +348,89 @@ async def _api_list_models(send):
         "status": "ok",
         "models": models,
         "total": len(models),
+    })
+
+
+async def _api_create_debate(send, body, token):
+    """POST /admin/api/debates — Créer et lancer un débat via l'API admin."""
+    try:
+        data = json.loads(body) if body else {}
+    except json.JSONDecodeError:
+        return await _json_response(send, 400, {
+            "status": "error",
+            "message": "JSON invalide",
+        })
+
+    question = (data.get("question") or "").strip()
+    participants = data.get("participants") or []
+    mode = data.get("mode")
+    config = data.get("config") or {}
+    persona_overrides = data.get("persona_overrides")
+
+    from ..routers.debates import (
+        _MAX_QUESTION_LENGTH,
+        _MAX_ROUNDS,
+        _VALID_MODES,
+        _active_debates,
+        _debate_events,
+        _debate_events_history,
+        _run_debate_task,
+        get_orchestrator,
+    )
+    import asyncio
+
+    if not question or len(question) < 5 or len(question) > _MAX_QUESTION_LENGTH:
+        return await _json_response(send, 400, {
+            "status": "error",
+            "message": f"Question requise (5 à {_MAX_QUESTION_LENGTH} caractères)",
+        })
+    if not isinstance(participants, list) or len(participants) < 2 or len(participants) > 5:
+        return await _json_response(send, 400, {
+            "status": "error",
+            "message": "2 à 5 participants requis",
+        })
+    if mode and mode not in _VALID_MODES:
+        return await _json_response(send, 400, {
+            "status": "error",
+            "message": f"Mode invalide. Valeurs: {', '.join(sorted(_VALID_MODES))}",
+        })
+
+    if "max_rounds" in config:
+        try:
+            config["max_rounds"] = min(max(int(config["max_rounds"]), 1), _MAX_ROUNDS)
+        except (TypeError, ValueError):
+            return await _json_response(send, 400, {
+                "status": "error",
+                "message": "max_rounds doit être un entier",
+            })
+
+    orchestrator = get_orchestrator()
+    debate = orchestrator.create_debate(
+        question=question,
+        participant_specs=participants,
+        persona_overrides=persona_overrides,
+        config_overrides=config or None,
+        mode=mode,
+    )
+
+    if len(debate.participants) < 2:
+        return await _json_response(send, 400, {
+            "status": "error",
+            "message": "Au moins 2 participants valides sont requis.",
+        })
+
+    debate.owner = _get_token_client_name(token)
+    _active_debates[debate.id] = debate
+    _debate_events[debate.id] = asyncio.Queue()
+    _debate_events_history[debate.id] = []
+    asyncio.create_task(_run_debate_task(debate.id))
+
+    await _json_response(send, 200, {
+        "status": "ok",
+        "debate_id": debate.id,
+        "question": debate.question,
+        "participants": len(debate.participants),
+        "stream_url": f"/admin/api/debates/{debate.id}/stream",
     })
 
 
@@ -426,6 +537,102 @@ async def _api_get_debate(send, debate_id, token):
         send, 404,
         {"status": "error", "message": f"Débat '{debate_id}' non trouvé"},
     )
+
+
+async def _api_stream_debate(send, debate_id, token):
+    """GET /admin/api/debates/{id}/stream — Stream NDJSON d'un débat actif."""
+    is_admin = _is_admin(token)
+    client = _get_token_client_name(token)
+    response_started = False
+
+    try:
+        from ..routers.debates import _active_debates, _debate_events
+        debate = _active_debates.get(debate_id)
+        if not debate or debate_id not in _debate_events:
+            return await _json_response(
+                send, 404,
+                {"status": "error", "message": f"Débat '{debate_id}' non trouvé"},
+            )
+        if not is_admin and getattr(debate, 'owner', '') != client:
+            return await _json_response(
+                send, 404,
+                {"status": "error", "message": f"Débat '{debate_id}' non trouvé"},
+            )
+
+        await send({
+            "type": "http.response.start",
+            "status": 200,
+            "headers": [
+                (b"content-type", b"application/x-ndjson"),
+                (b"cache-control", b"no-cache"),
+                (b"x-accel-buffering", b"no"),
+            ],
+        })
+        response_started = True
+
+        queue = _debate_events.get(debate_id)
+        while True:
+            event = await queue.get()
+            if event is None:
+                break
+            line = json.dumps(event, ensure_ascii=False).encode() + b"\n"
+            await send({"type": "http.response.body", "body": line, "more_body": True})
+
+        await send({"type": "http.response.body", "body": b"", "more_body": False})
+    except Exception:
+        if response_started:
+            error_line = json.dumps({
+                "type": "error",
+                "debate_id": debate_id,
+                "error": "Erreur interne lors du stream",
+            }, ensure_ascii=False).encode() + b"\n"
+            return await send({
+                "type": "http.response.body",
+                "body": error_line,
+                "more_body": False,
+            })
+        return await _json_response(
+            send, 500,
+            {"status": "error", "message": "Erreur interne lors du stream"},
+        )
+
+
+async def _api_cancel_debate(send, debate_id, token):
+    """POST /admin/api/debates/{id}/cancel — Arrêter un débat actif."""
+    is_admin = _is_admin(token)
+    client = _get_token_client_name(token)
+
+    try:
+        from ..routers.debates import _active_debates, _cancelled_debates
+        debate = _active_debates.get(debate_id)
+        if not debate:
+            return await _json_response(
+                send, 404,
+                {"status": "error", "message": f"Débat '{debate_id}' non trouvé"},
+            )
+        if not is_admin and getattr(debate, 'owner', '') != client:
+            return await _json_response(
+                send, 404,
+                {"status": "error", "message": f"Débat '{debate_id}' non trouvé"},
+            )
+
+        status = getattr(getattr(debate, "status", None), "value", getattr(debate, "status", None))
+        if status not in ("running", "paused"):
+            return await _json_response(send, 409, {
+                "status": "error",
+                "message": f"Le débat n'est pas en cours (status={status})",
+            })
+
+        _cancelled_debates.add(debate_id)
+        return await _json_response(send, 200, {
+            "status": "ok",
+            "message": "Demande d'arrêt envoyée",
+        })
+    except Exception:
+        return await _json_response(
+            send, 500,
+            {"status": "error", "message": "Erreur interne lors de l'arrêt du débat"},
+        )
 
 
 async def _api_delete_debate(send, debate_id, token):
@@ -648,6 +855,23 @@ def _is_admin(token: str) -> bool:
         info = store.get_by_hash(h)
         if info and "admin" in info.get("permissions", []) and not info.get("revoked"):
             return True
+    return False
+
+
+def _has_permission(token: str, permission: str) -> bool:
+    """Vérifie une permission read/write/admin sur bootstrap key ou token S3."""
+    if not token:
+        return False
+    settings = get_settings()
+    if hmac.compare_digest(token, settings.admin_bootstrap_key):
+        return True
+    store = get_token_store()
+    if store:
+        h = hashlib.sha256(token.encode()).hexdigest()
+        info = store.get_by_hash(h)
+        if info and not info.get("revoked"):
+            permissions = info.get("permissions", [])
+            return "admin" in permissions or permission in permissions
     return False
 
 

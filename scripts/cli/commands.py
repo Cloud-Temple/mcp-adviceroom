@@ -294,28 +294,21 @@ def debate_start_cmd(ctx, question, models, mode, rounds):
 
         # 1. Récupérer les modèles disponibles
         console.print(f"\n  [dim]Connexion à {ctx.obj['url']}...[/]")
-        providers_data = await client.get_providers()
-        if providers_data.get("status") == "error":
-            show_error(providers_data.get("message", "Impossible de récupérer les modèles"))
+        models_data = await client.list_models()
+        if models_data.get("status") == "error":
+            show_error(models_data.get("message", "Impossible de récupérer les modèles"))
             return
 
         # Construire le registre plat {model_id: {...}}
-        model_registry = {}
-        for cat_info in providers_data.get("categories", {}).values():
-            for m in cat_info.get("models", []):
-                model_registry[m["id"]] = m
+        available_models = [m for m in models_data.get("models", []) if m.get("active", True)]
+        model_registry = {m["id"]: m for m in available_models}
 
         # Résoudre les modèles
         if models:
             model_ids = [m.strip() for m in models.split(",")]
         else:
             # Modèles par défaut
-            defaults = [
-                m["id"]
-                for cat in providers_data.get("categories", {}).values()
-                for m in cat.get("models", [])
-                if m.get("default")
-            ]
+            defaults = [m["id"] for m in available_models if m.get("default")]
             model_ids = defaults[:3] if len(defaults) >= 3 else defaults[:2]
 
         if len(model_ids) < 2:

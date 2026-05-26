@@ -1568,8 +1568,8 @@ async function startDebate(){
     document.getElementById('dc-error').textContent='';
 
     try{
-        // POST to create debate via REST API (AuthMiddleware accepts bootstrap key)
-        const resp=await fetch('/api/v1/debates',{
+        // POST to create debate via Admin API (AuthMiddleware accepts bootstrap key)
+        const resp=await fetch('/admin/api/debates',{
             method:'POST',
             headers:hdr(),
             body:JSON.stringify({question:q,participants,mode:document.getElementById('dc-mode').value||'parallel',config:{max_rounds:maxRounds},persona_overrides:Object.keys(persona_overrides).length?persona_overrides:null})
@@ -1599,7 +1599,7 @@ async function startDebate(){
         loadDebates();
 
         // Stream NDJSON events
-        monitorDebate(data.debate_id, data.stream_url||`/api/v1/debates/${data.debate_id}/stream`);
+        monitorDebate(data.debate_id, data.stream_url||`/admin/api/debates/${data.debate_id}/stream`);
     }catch(e){
         document.getElementById('dc-error').textContent='❌ '+e.message;
     }finally{
@@ -1784,7 +1784,7 @@ async function stopDebate(){
     btn.disabled=true;
     btn.textContent='⏳ Arrêt…';
     try{
-        const resp=await fetch(`/api/v1/debates/${DM_DEBATE_ID}/cancel`,{method:'POST',headers:hdr()});
+        const resp=await fetch(`/admin/api/debates/${DM_DEBATE_ID}/cancel`,{method:'POST',headers:hdr()});
         const d=await resp.json();
         if(resp.ok){showToast('🛑 '+d.message)}
         else{showToast('❌ '+(d.detail||d.message||'Erreur'),true)}

@@ -39,6 +39,13 @@
 	header X-Frame-Options "DENY"
 	header Referrer-Policy "strict-origin-when-cross-origin"
 
+	# Admin NDJSON streams must not be buffered.
+	handle /admin/api/debates/*/stream {
+		reverse_proxy backend:8000 {
+			flush_interval -1
+		}
+	}
+
 	# V1-11 : Admin console (proxifié par le WAF)
 	handle /admin* {
 		reverse_proxy backend:8000

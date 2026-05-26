@@ -11,12 +11,16 @@ versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
 - **MCP Streamable HTTP** : le lifespan du sous-app FastMCP est maintenant propagé par le parent FastAPI. Corrige le `500 Internal Server Error` avec `RuntimeError: Task group is not initialized` sur `/mcp`
 - **Bootstrap admin** : `.env.example` documente `ADMIN_BOOTSTRAP_KEY`; `ADVICEROOM_BOOTSTRAP_KEY` reste accepté comme alias legacy
+- **CLI alignée sur `/admin`** : `debate start` et le shell interactif utilisent maintenant `/admin/api/models`, `POST /admin/api/debates` et le stream `/admin/api/debates/{id}/stream`, sans détour par `/api/v1`
+- **API admin débats** : ajout de `POST /admin/api/debates`, `GET /admin/api/debates/{id}/stream` et `POST /admin/api/debates/{id}/cancel` pour que la console et la CLI utilisent la même surface protégée
 - **Console admin** : pendant un débat en cours, le monitoring live ne masque plus la liste des autres débats
 - **Question de débat** : rendu Markdown activé dans le monitoring live et le viewer détail, avec hauteur bornée et scroll vertical pour les très gros prompts
+- **WAF streaming admin** : le stream NDJSON des débats sous `/admin/api/debates/*/stream` est explicitement non bufferisé
 
 ### Modifié
 
 - **OpenAI** : modèle par défaut et registre LLM mis à jour de GPT-5.2 vers GPT-5.4 (`gpt-54` / `gpt-5.4`)
+- **Documentation** : README FR/EN, design d'architecture et commentaires Docker Compose mis à jour pour refléter la surface principale `/admin/api/*`
 
 ---
 

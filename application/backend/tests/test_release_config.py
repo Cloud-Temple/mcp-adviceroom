@@ -53,3 +53,26 @@ def test_admin_question_markdown_and_scroll_are_wired():
     assert "document.getElementById('dm-question').innerHTML=md(q)" in admin_html
     assert "document.getElementById('debates-list-view').style.display='';" in admin_html
     assert "max-height: min(320px, 45vh)" in admin_html
+
+
+def test_cli_debate_start_is_aligned_with_admin_api():
+    cli_client = (ROOT / "scripts" / "cli" / "client.py").read_text()
+    cli_commands = (ROOT / "scripts" / "cli" / "commands.py").read_text()
+    cli_shell = (ROOT / "scripts" / "cli" / "shell.py").read_text()
+    admin_html = (BACKEND / "app" / "static" / "admin.html").read_text()
+    caddyfile = (ROOT / "waf" / "Caddyfile").read_text()
+
+    assert 'return await self._post("/admin/api/debates", body)' in cli_client
+    assert "/admin/api/debates/{id}/stream" in cli_client
+    assert "await client.list_models()" in cli_commands
+    assert "await client.list_models()" in cli_shell
+    assert "get_providers" not in cli_client
+    assert "get_providers" not in cli_commands
+    assert "get_providers" not in cli_shell
+    assert "/api/v1/debates" not in cli_client
+    assert "fetch('/admin/api/debates'" in admin_html
+    assert "`/admin/api/debates/${data.debate_id}/stream`" in admin_html
+    assert "`/admin/api/debates/${DM_DEBATE_ID}/cancel`" in admin_html
+    assert "/api/v1/debates" not in admin_html
+    assert "handle /admin/api/debates/*/stream" in caddyfile
+    assert "flush_interval -1" in caddyfile

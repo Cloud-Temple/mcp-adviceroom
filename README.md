@@ -23,7 +23,7 @@ AdviceRoom orchestre des **débats structurés entre LLMs hétérogènes**. L'ut
 | 🎯     | **Débats multi-LLM**     | Jusqu'à 5 participants + 1 synthétiseur dédié                           |
 | 🛡️   | **Multi-provider**       | LLMaaS SecNumCloud, OpenAI, Anthropic, Google Gemini                    |
 | 🔬     | **Protocole académique** | Anti-ancrage, anti-conformité, arrêt adaptatif par stabilité            |
-| 🤖     | **Double interface**     | MCP (agents IA) + Web UI (humains)                                      |
+| 🤖     | **Double interface**     | MCP (agents IA) + console `/admin`/CLI (humains)                        |
 | ⚡      | **Streaming temps réel** | NDJSON avec événements granulaires                                      |
 | 🧑‍💬 | **User-in-the-loop**     | Les LLMs peuvent poser des questions à l'utilisateur                    |
 | 🔧     | **Outils LLM**           | web_search, calculator, datetime via MCP Tools                          |
@@ -37,7 +37,8 @@ AdviceRoom orchestre des **débats structurés entre LLMs hétérogènes**. L'ut
 ```
 WAF (Caddy + Coraza)
   └── Backend (FastAPI + FastMCP) — Un seul processus
-       ├── API REST /api/v1/     (Web UI, CLI)
+       ├── Admin API /admin/api/ (Console web, CLI)
+       ├── API REST /api/v1/     (Compatibilité REST/MCP interne)
        ├── MCP /mcp              (Agents IA)
        ├── Admin /admin          (Console web SPA)
        └── Debate Engine
@@ -201,6 +202,9 @@ La console utilise une API REST dédiée sous `/admin/api/` :
 | GET     | `/admin/api/whoami`        | read  | Identité du token courant    |
 | GET     | `/admin/api/models`        | read  | Modèles LLM disponibles      |
 | GET     | `/admin/api/debates`       | read  | Liste des débats             |
+| POST    | `/admin/api/debates`       | write | Créer et lancer un débat     |
+| GET     | `/admin/api/debates/{id}/stream` | read  | Stream NDJSON temps réel     |
+| POST    | `/admin/api/debates/{id}/cancel` | write | Arrêter un débat en cours    |
 | GET     | `/admin/api/debates/{id}`  | read  | Détails d'un débat           |
 | GET     | `/admin/api/logs`          | read  | Activité récente             |
 | GET     | `/admin/api/llm-activity`  | read  | Log activité LLM             |
@@ -211,11 +215,11 @@ La console utilise une API REST dédiée sous `/admin/api/` :
 
 ## CLI
 
-La CLI est alignée 1:1 avec l'API admin. Deux modes d'utilisation : commandes scriptables (Click) et shell interactif.
+La CLI est alignée sur l'API admin `/admin/api/*`, y compris `debate start` et le stream NDJSON (`/admin/api/debates/{id}/stream`). Deux modes d'utilisation : commandes scriptables (Click) et shell interactif.
 
 ```bash
 # Variables d'environnement
-export ADVICEROOM_URL=http://localhost:8000
+export ADVICEROOM_URL=http://localhost:8088  # WAF local ; http://localhost:8000 si backend direct en dev
 export ADVICEROOM_TOKEN=votre-token
 
 # Commandes de base

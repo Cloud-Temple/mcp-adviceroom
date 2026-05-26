@@ -17,7 +17,7 @@
 - **Agnostique au domaine** : questions stratégiques, techniques, ou ouvertes
 - **Multi-provider** : LLMs SNC (gpt-oss, gemma4, qwen) + cloud public (GPT, Claude, Gemini)
 - **Outillé** : les LLMs ont accès à des outils (recherche internet, base de connaissance, calcul, MCP externes)
-- **Double interface** : MCP (pour agents IA) + Web UI (pour humains)
+- **Double interface** : MCP (pour agents IA) + console `/admin`/CLI (pour humains)
 
 ### 1.2 Cas d'usage cibles
 
@@ -192,7 +192,7 @@ Un **LLM synthétiseur dédié** (6ème LLM, hors quota des 5 max) analyse la tr
     {
       "topic": "Timeline de migration",
       "positions": {
-        "camp_a": {"participants": ["gpt-5.2", "claude-opus"], "position": "6 mois"},
+        "camp_a": {"participants": ["gpt-54", "claude-opus"], "position": "6 mois"},
         "camp_b": {"participants": ["gemini-3.1-pro"], "position": "12 mois"}
       }
     }
@@ -230,7 +230,7 @@ Quand un LLM émet une question pour l'utilisateur :
 1. Le débat entre en état **`paused`**
 2. L'événement `user_question` est émis dans le stream
 3. **Tous** les participants sont en attente (pause complète)
-4. L'utilisateur répond via l'API ou la Web UI
+4. L'utilisateur répond via l'API ou la console `/admin`
 5. La réponse est ajoutée au contexte pour **tous** les participants
 6. Le débat reprend au point exact où il s'était arrêté
 
@@ -242,13 +242,13 @@ Quand un LLM émet une question pour l'utilisateur :
 
 ```
                     ┌──────────────┐
-                    │   Web UI     │  React + Vite + Tailwind
-                    │  (Frontend)  │  Design System Cloud Temple
+                    │  Admin Web   │  /admin (SPA backend admin.html)
+                    │  + CLI       │  /admin/api/*
                     └──────┬───────┘
                            │ NDJSON streaming
                     ┌──────┴───────┐
-                    │   Backend    │  FastAPI (Python)
-                    │  (API REST)  │  Debate Orchestrator
+                    │   Backend    │  FastAPI + FastMCP (Python)
+                    │ /admin/api   │  Debate Orchestrator
                     └──────┬───────┘
               ┌────────────┼────────────┐
               │            │            │
@@ -280,17 +280,26 @@ Quand un LLM émet une question pour l'utilisateur :
 
 Le backend est le cœur du système. Il expose :
 
-**API REST** :
-| Méthode | Endpoint                         | Description                            |
-| ------- | -------------------------------- | -------------------------------------- |
-| `POST`  | `/api/v1/debates`                | Créer un nouveau débat                 |
-| `GET`   | `/api/v1/debates/:id/stream`     | Stream NDJSON du débat en temps réel   |
-| `POST`  | `/api/v1/debates/:id/answer`     | Réponse utilisateur à une question LLM |
-| `GET`   | `/api/v1/debates/:id`            | État / historique d'un débat           |
-| `GET`   | `/api/v1/debates`                | Liste des débats (par API key)         |
-| `GET`   | `/api/v1/debates/:id/transcript` | Export Markdown du transcript          |
-| `GET`   | `/api/v1/providers`              | Liste des LLMs disponibles             |
-| `GET`   | `/api/v1/providers/:id/status`   | Statut d'un provider                   |
+**Admin API — surface principale console + CLI (`/admin/api/*`)** :
+| Méthode | Endpoint                              | Description                            |
+| ------- | ------------------------------------- | -------------------------------------- |
+| `GET`   | `/admin/api/health`                   | État du serveur + LLM Router           |
+| `GET`   | `/admin/api/whoami`                   | Identité du token courant              |
+| `GET`   | `/admin/api/models`                   | Liste des LLMs disponibles             |
+| `GET`   | `/admin/api/debates`                  | Liste des débats filtrée par owner     |
+| `POST`  | `/admin/api/debates`                  | Créer et lancer un débat               |
+| `GET`   | `/admin/api/debates/:id/stream`       | Stream NDJSON du débat en temps réel   |
+| `POST`  | `/admin/api/debates/:id/cancel`       | Arrêter un débat actif                 |
+| `GET`   | `/admin/api/debates/:id`              | Détail complet d'un débat              |
+| `DELETE`| `/admin/api/debates/:id`              | Supprimer un débat                     |
+| `GET`   | `/admin/api/logs`                     | Ring buffer HTTP                       |
+| `GET`   | `/admin/api/llm-activity`             | Activité LLM détaillée                 |
+| `GET`   | `/admin/api/tokens`                   | Lister les tokens                      |
+| `POST`  | `/admin/api/tokens`                   | Créer un token                         |
+| `DELETE`| `/admin/api/tokens/:hash`             | Révoquer un token                      |
+
+**API REST `/api/v1/*`** :
+Cette surface reste disponible pour compatibilité REST et intégrations directes. La console `/admin` et la CLI utilisent désormais `/admin/api/*`, y compris la création, l'arrêt de débat et le stream NDJSON.
 
 **Requête de création** :
 ```json
@@ -301,7 +310,7 @@ Le backend est le cœur du système. Il expose :
     {"provider": "anthropic", "model": "claude-opus-4.6"},
     {"provider": "google", "model": "gemini-3.1-pro"},
     {"provider": "snc", "model": "gemma4:31b"},
-    {"provider": "openai", "model": "gpt-5.2"}
+    {"provider": "openai", "model": "gpt-54"}
   ],
   "persona_overrides": {
     "claude-opus-4.6": "Expert sécurité"
@@ -400,35 +409,30 @@ Tous les outils sont disponibles pour **tous** les LLMs participants.
 
 #### 4.2.5 MCP Server — même processus que le Backend
 
-> **Décision architecturale** : le serveur MCP et le backend REST vivent dans le **même processus FastAPI**. Le backend sert à la fois `/api/v1/` (REST pour la Web UI) et `/mcp` (Streamable HTTP pour les agents IA). Pas de service séparé, pas de communication inter-processus.
+> **Décision architecturale** : le serveur MCP, l'API admin, l'API REST de compatibilité et le moteur de débat vivent dans le **même processus FastAPI**. Le backend sert `/admin` + `/admin/api/*` pour la console et la CLI, `/api/v1/*` pour compatibilité REST, et `/mcp` en Streamable HTTP pour les agents IA. Pas de service séparé, pas de communication inter-processus.
 >
 > **Justification** : le Debate Engine est le même code dans les deux cas. Séparer en deux services forcerait soit une duplication du moteur, soit une API REST interne (latence + complexité). Le pattern starter-kit montre déjà comment monter FastMCP dans une app ASGI existante via `create_app()`.
 
 ```python
-# app/main.py — un seul processus, deux interfaces
+# app/main.py — un seul processus, plusieurs surfaces HTTP
 def create_app():
-    # FastMCP (innermost) — sert /mcp
-    mcp_app = mcp.streamable_http_app()
-    
-    # Pile middleware ASGI (pattern starter-kit)
-    app = AuthMiddleware(mcp_app)
+    fastapi_app = FastAPI(title="AdviceRoom")
+
+    # REST de compatibilité sous /api/v1/*
+    fastapi_app.include_router(debates_router, prefix="/api/v1")
+    fastapi_app.include_router(providers_router, prefix="/api/v1")
+    fastapi_app.mount("/mcp", mcp_app)
+
+    # Pile ASGI réelle : Logging → Admin → Health → Auth → FastAPI+FastMCP
+    app = fastapi_app
+    app = AuthMiddleware(app)
     app = HealthCheckMiddleware(app)
     app = AdminMiddleware(app, mcp)
     app = LoggingMiddleware(app)
-    
-    # Mount FastAPI REST sous /api/v1/
-    fastapi_app = FastAPI(title="AdviceRoom")
-    fastapi_app.include_router(debates_router, prefix="/api/v1")
-    fastapi_app.include_router(providers_router, prefix="/api/v1")
-    
-    # Combiner les deux
-    fastapi_app.mount("/mcp", app)       # Agents IA
-    fastapi_app.mount("/admin", admin)    # Console admin
-    
-    return fastapi_app
+    return app
 ```
 
-**Conséquence sur le docker-compose** : le service `mcp-server` séparé est **supprimé**. Le backend sert tout. Le docker-compose passe de 6 à 5 services.
+**Conséquence sur le docker-compose** : le service `mcp-server` séparé est **supprimé**. Le backend sert tout. Le docker-compose actif contient 4 services : `waf`, `backend`, `frontend` (build/healthcheck, non exposé publiquement) et `redis`.
 
 **Outils MCP exposés** (dans `app/mcp/tools.py`) :
 
@@ -447,7 +451,7 @@ def create_app():
 
 Les outils MCP appellent **directement** les mêmes services internes (`DebateOrchestrator`, `LLMRouter`, etc.) que les endpoints REST — pas d'indirection réseau.
 
-#### 4.2.6 Frontend — React
+#### 4.2.6 Console admin et frontend
 
 ```
 frontend/src/
@@ -483,6 +487,8 @@ frontend/src/
 └── layouts/
     └── AppShell.jsx      # Dupliqué depuis QuoteFlow
 ```
+
+La surface humaine principale est aujourd'hui la console `/admin`, servie par le backend via `application/backend/app/static/admin.html` et protégée par Bearer token. La CLI utilise la même surface fonctionnelle sous `/admin/api/*`. Le frontend React reste dans le compose pour build/healthcheck et compatibilité de développement, mais le WAF ne l'expose plus publiquement.
 
 #### 4.2.7 Storage — S3
 
@@ -523,9 +529,9 @@ Le flux NDJSON est le protocole de communication temps réel entre le backend et
 {"type": "turn_end", "participant_id": "claude-opus-4.6", "position": "pour", "confidence": 85}
 
 {"type": "phase", "phase": "debate", "round": 1}
-{"type": "turn_start", "participant": {"model": "gpt-5.2", "provider": "openai", "persona": "Pragmatique"}}
-{"type": "chunk", "participant_id": "gpt-5.2", "content": "Je conteste l'argument de Claude..."}
-{"type": "turn_end", "participant_id": "gpt-5.2", "position": "contre", "confidence": 72}
+{"type": "turn_start", "participant": {"model": "gpt-54", "provider": "openai", "persona": "Pragmatique"}}
+{"type": "chunk", "participant_id": "gpt-54", "content": "Je conteste l'argument de Claude..."}
+{"type": "turn_end", "participant_id": "gpt-54", "position": "contre", "confidence": 72}
 
 {"type": "user_question", "participant_id": "gemini-3.1-pro", "question": "Quelle est la taille de votre équipe DevOps ?"}
 {"type": "debate_paused", "reason": "waiting_for_user"}
@@ -587,14 +593,15 @@ models:
     active: true
 
   # --- OpenAI ---
-  - id: gpt-52
-    display_name: "GPT-5.2"
+  - id: gpt-54
+    display_name: "GPT-5.4"
     provider: openai
     category: externe
-    api_model_id: "gpt-5.2"
+    api_model_id: "gpt-5.4"
     capabilities: [chat, tools, streaming]
-    context_window: 200000
+    context_window: 1000000
     active: true
+    default: true
 
   # --- Anthropic ---
   - id: claude-opus-46
@@ -646,13 +653,14 @@ L'interface est normalisée au format OpenAI (standard interne hérité de Quote
 | Configuration | pydantic-settings        | Variables d'environnement + `.env` |
 | LLM clients   | httpx (async)            | Appels aux APIs LLM                |
 | S3            | boto3                    | Stockage des débats                |
-| Auth          | JWT RS256 + Bearer Token | Double mode (Web UI + MCP)         |
+| Auth          | Bearer Token             | Admin API + MCP                    |
 
 ### 6.2 Frontend
 
 | Composant     | Technologie                    | Rôle                           |
 | ------------- | ------------------------------ | ------------------------------ |
-| Framework     | React 18 + Vite                | SPA moderne                    |
+| Console admin | HTML/CSS/JS backend-served     | Surface `/admin` protégée      |
+| Framework     | React 18 + Vite                | Frontend conservé hors exposition WAF |
 | CSS           | Tailwind CSS                   | Styling utilitaire             |
 | Design System | Cloud Temple DS (de QuoteFlow) | Tokens, composants, layouts    |
 | Streaming     | useNDJSONStream (de QuoteFlow) | Consommation NDJSON temps réel |
@@ -666,12 +674,12 @@ L'interface est normalisée au format OpenAI (standard interne hérité de Quote
 | Conteneurs   | Docker + Docker Compose             | Déploiement                   |
 | WAF          | Caddy + Coraza                      | TLS, rate limiting, OWASP CRS |
 | Storage      | S3 Dell ECS (Cloud Temple)          | Débats, tokens, config        |
-| Auth service | FastAPI microservice (de QuoteFlow) | JWT RS256 + JWKS              |
+| Auth service | Prévu phase ultérieure              | Service commenté dans Compose  |
 | Redis        | Redis 7                             | Cache JWKS, sessions          |
 
 ### 6.4 Docker Compose
 
-Voir §17 pour le Docker Compose révisé (5 services après fusion MCP + Backend).
+Voir §17 pour le Docker Compose révisé (4 services actifs après fusion MCP + Backend).
 
 ---
 
@@ -728,9 +736,9 @@ Tous les composants sont **dupliqués** depuis QuoteFlow dans le repo AdviceRoom
 
 ### 8.2 Modèle d'authentification
 
-Deux modes coexistent :
-1. **Web UI** : JWT RS256 via auth microservice (login/password, optionnel OIDC)
-2. **MCP** : Bearer token simple via Token Store S3 (pattern starter-kit)
+Deux surfaces coexistent :
+1. **Console `/admin` + CLI** : Bearer token via bootstrap key ou Token Store S3
+2. **MCP** : Bearer token via le même Token Store S3 (pattern starter-kit)
 
 ---
 
@@ -1151,7 +1159,7 @@ context:
 # Synthétiseur
 synthesizer:
   default_model: "claude-opus-46" # Modèle par défaut pour le verdict
-  fallback_model: "gpt-52"       # Fallback si le premier échoue
+  fallback_model: "gpt-54"       # Fallback si le premier échoue
 
 # Streaming
 streaming:
@@ -1476,18 +1484,19 @@ Les résultats d'outils sont traités spécialement :
 
 ## 17. Docker Compose révisé
 
-Suite à la fusion MCP Server + Backend (§4.2.5), le docker-compose est simplifié à 5 services :
+Suite à la fusion MCP Server + Backend (§4.2.5), le docker-compose actif est simplifié à 4 services :
 
 ```yaml
 services:
   waf:
     build: ./waf
     ports:
-      - "${WAF_PORT:-8082}:8082"
+      - "${WAF_PORT:-8088}:8088"
     depends_on:
-      - backend
-    networks:
-      - adviceroom-net
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
 
   backend:
     build: ./application/backend
@@ -1495,39 +1504,22 @@ services:
       - "8000"                    # Sert /api/v1/ + /mcp + /admin + /health
     env_file: .env
     depends_on:
-      - redis
-    networks:
-      - adviceroom-net
+      redis:
+        condition: service_started
 
   frontend:
     build: ./application/frontend
-    ports:
-      - "${FRONTEND_PORT:-5173}:5173"
-    depends_on:
-      - backend
-    networks:
-      - adviceroom-net
-
-  auth:
-    build: ./application/auth
+    # Non exposé par le WAF ; conservé pour build/healthcheck.
     expose:
-      - "8001"
-    env_file: .env
-    depends_on:
-      - redis
-    networks:
-      - adviceroom-net
+      - "3000"
 
   redis:
     image: redis:7-alpine
     expose:
       - "6379"
-    networks:
-      - adviceroom-net
 
-networks:
-  adviceroom-net:
-    driver: bridge
+volumes:
+  redis_data:
 ```
 
-> **Note** : le service `mcp-server` a été supprimé. Le backend sert `/mcp` directement.
+> **Note** : le service `mcp-server` a été supprimé. Le backend sert `/mcp` directement. Le service `auth` reste documenté comme extension future, mais il n'est pas actif dans le compose courant.
