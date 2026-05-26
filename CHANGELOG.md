@@ -15,6 +15,7 @@ versionning [Semantic Versioning](https://semver.org/lang/fr/).
 - **API admin débats** : ajout de `POST /admin/api/debates`, `GET /admin/api/debates/{id}/stream` et `POST /admin/api/debates/{id}/cancel` pour que la console et la CLI utilisent la même surface protégée
 - **Console admin** : pendant un débat en cours, le monitoring live ne masque plus la liste des autres débats
 - **Question de débat** : rendu Markdown activé dans le monitoring live et le viewer détail, avec hauteur bornée et scroll vertical pour les très gros prompts
+- **Dashboard `/admin`** : la fiche "Dernier débat" rend maintenant Markdown et reste bornée avec ascenseur pour les gros prompts
 - **WAF streaming admin** : le stream NDJSON des débats sous `/admin/api/debates/*/stream` est explicitement non bufferisé
 
 ### Modifié
