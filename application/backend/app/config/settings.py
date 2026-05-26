@@ -7,6 +7,7 @@ Chaque setting est documenté et typé.
 from functools import lru_cache
 from typing import Optional
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings
 
 
@@ -22,7 +23,13 @@ class Settings(BaseSettings):
     backend_port: int = 8000
 
     # --- Auth (pattern Cloud Temple) ---
-    admin_bootstrap_key: str = "changeme-in-production"
+    admin_bootstrap_key: str = Field(
+        default="changeme-in-production",
+        validation_alias=AliasChoices(
+            "ADMIN_BOOTSTRAP_KEY",
+            "ADVICEROOM_BOOTSTRAP_KEY",
+        ),
+    )
 
     # --- LLMaaS (Cloud Temple SecNumCloud) ---
     llmaas_api_url: str = "https://api.ai.cloud-temple.com"

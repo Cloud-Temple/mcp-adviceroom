@@ -12,6 +12,7 @@ Ref: starter-kit/README.md §2 (Architecture — La règle des 3 couches + 5 mid
 import sys
 import json
 import unicodedata
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -44,6 +45,61 @@ mcp = FastMCP(
 from .mcp.tools import register_tools  # noqa: E402
 register_tools(mcp)
 
+class StreamableHTTPAppProxy:
+    """
+    Stable mounted ASGI app that can swap its FastMCP sub-app at startup.
+
+    FastMCP's StreamableHTTPSessionManager can only be run once per instance.
+    Recreating the sub-app for each parent lifespan keeps production startup
+    correct and avoids brittle ASGI restart/test-client cycles.
+    """
+
+    def __init__(self, app_factory):
+        self._app_factory = app_factory
+        self._app = app_factory()
+
+    def reset(self):
+        self._app = self._app_factory()
+        return self._app
+
+    async def __call__(self, scope, receive, send):
+        await self._app(scope, receive, send)
+
+
+def _new_streamable_http_app():
+    # FastMCP caches the StreamableHTTPSessionManager internally. Its manager
+    # cannot be restarted after shutdown, so a new ASGI app also needs a new
+    # manager for each parent lifespan.
+    mcp._session_manager = None
+    return mcp.streamable_http_app()
+
+
+# FastMCP's streamable HTTP app owns a lifespan that initializes the session
+# manager task group. Starlette does not run mounted sub-app lifespans, so the
+# parent FastAPI app must enter it explicitly.
+mcp_app = StreamableHTTPAppProxy(_new_streamable_http_app)
+
+
+@asynccontextmanager
+async def _noop_lifespan(app):
+    yield
+
+
+def _mcp_lifespan_context():
+    reset = getattr(mcp_app, "reset", None)
+    streamable_app = reset() if reset is not None else mcp_app
+
+    lifespan_context = getattr(streamable_app, "lifespan", None)
+    if lifespan_context is not None:
+        return lifespan_context(streamable_app)
+
+    router = getattr(streamable_app, "router", None)
+    lifespan_context = getattr(router, "lifespan_context", None)
+    if lifespan_context is not None:
+        return lifespan_context(streamable_app)
+
+    return _noop_lifespan(streamable_app)
+
 # =============================================================================
 # FastAPI instance (routes REST pour la web UI + API)
 # =============================================================================
@@ -53,11 +109,19 @@ _vf = Path(__file__).parent.parent / "VERSION"
 if _vf.exists():
     _version = _vf.read_text().strip()
 
+
+@asynccontextmanager
+async def lifespan(app):
+    async with _mcp_lifespan_context():
+        yield
+
+
 fastapi_app = FastAPI(
     title="AdviceRoom",
     version=_version,
     docs_url=None,  # Pas de Swagger en prod
     redoc_url=None,
+    lifespan=lifespan,
 )
 
 # Routes REST
@@ -67,7 +131,7 @@ fastapi_app.include_router(providers_router, prefix="/api/v1")
 # Monter FastMCP sur /mcp
 # Le streamable_http_path="/" dans le constructeur FastMCP ci-dessus
 # évite le double préfixe /mcp/mcp (le défaut FastMCP est "/mcp")
-fastapi_app.mount("/mcp", mcp.streamable_http_app())
+fastapi_app.mount("/mcp", mcp_app)
 
 
 # =============================================================================
