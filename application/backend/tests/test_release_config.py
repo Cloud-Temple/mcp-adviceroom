@@ -88,3 +88,15 @@ def test_admin_dashboard_model_health_is_wired():
     assert "renderModelHealthCard" in admin_html
     assert 'path == "/admin/api/model-health"' in admin_api
     assert "async def _api_model_health" in admin_api
+
+
+def test_dashboard_last_debate_supports_markdown_and_scroll():
+    admin_html = (BACKEND / "app" / "static" / "admin.html").read_text()
+
+    assert "last-debate-question" in admin_html
+    assert "last-debate-summary" in admin_html
+    assert "max-height: min(180px, 24vh)" in admin_html
+    assert "max-height: 140px" in admin_html
+    assert "${md(last.question||'Sans titre')}" in admin_html
+    assert "${md(v.summary)}" in admin_html
+    assert "${esc(last.question||'Sans titre')}" not in admin_html

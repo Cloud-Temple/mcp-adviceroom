@@ -143,6 +143,21 @@ body {
 .stat .value { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
 .stat .label { font-size: 0.65rem; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
 
+/* Dashboard last debate */
+.last-debate-card { padding: 16px 20px; }
+.last-debate-question {
+    font-size: 0.86rem; font-weight: 500; color: var(--text); line-height: 1.48;
+    max-height: min(180px, 24vh); overflow-y: auto; overflow-x: auto;
+    padding: 10px 12px; margin-bottom: 10px; border-radius: 8px;
+    background: rgba(10, 14, 26, 0.45); border: 1px solid var(--border);
+}
+.last-debate-summary {
+    font-size: 0.82rem; color: var(--text2); line-height: 1.5;
+    max-height: 140px; overflow-y: auto; overflow-x: auto;
+    padding: 10px 12px; border-radius: 8px; background: rgba(10, 14, 26, 0.32);
+}
+.last-debate-question pre, .last-debate-summary pre { white-space: pre-wrap; }
+
 /* Model health */
 .model-health-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
 .model-health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
@@ -966,9 +981,9 @@ async function loadDashboard(){
     if(completed.length>0){
         const last=completed[0];
         const v=last.verdict;
-        lastPanel.innerHTML=`<div class="card">
+        lastPanel.innerHTML=`<div class="card last-debate-card">
             <h3>🏛️ Dernier débat</h3>
-            <div style="font-size:0.95rem;font-weight:600;color:var(--text);margin-bottom:8px">${esc(last.question||'Sans titre')}</div>
+            <div class="last-debate-question question-markdown">${md(last.question||'Sans titre')}</div>
             <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">
                 ${(last.participants||[]).map(p=>`<span class="provider-badge ${providerClass(p.provider)}">${p.persona_icon||'🤖'} ${esc(p.display_name)}</span>`).join('')}
             </div>
@@ -978,7 +993,7 @@ async function loadDashboard(){
                 <span style="color:var(--muted);font-size:0.82rem">${last.num_rounds||'?'} rounds</span>
                 <span style="color:var(--muted);font-size:0.82rem">${fmtTokens(last.total_tokens)} tokens</span>
             </div>
-            <div style="font-size:0.85rem;color:var(--text2);line-height:1.5">${esc(v.summary)}</div>`:''}
+            <div class="last-debate-summary question-markdown">${md(v.summary)}</div>`:''}
             <div style="margin-top:8px;font-size:0.75rem;color:var(--muted)">${fmtDate(last.created_at)}</div>
         </div>`;
     } else {
