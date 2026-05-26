@@ -12,6 +12,7 @@ Endpoints :
     POST /admin/api/tokens        → Créer un token
     DEL  /admin/api/tokens/{hash} → Révoquer un token
     GET  /admin/api/logs          → Activité récente (ring buffer)
+    GET  /admin/api/model-health  → Test disponibilité providers LLM
     GET  /admin/api/debates       → Liste des débats S3
     POST /admin/api/debates       → Créer et lancer un débat
     GET  /admin/api/debates/{id}  → Détails d'un débat
@@ -25,6 +26,8 @@ import json
 import hmac
 import hashlib
 import platform
+import asyncio
+import time
 from pathlib import Path
 
 from ..config.settings import get_settings
@@ -65,6 +68,9 @@ async def handle_admin_api(scope, receive, send, mcp):
 
     if path == "/admin/api/models" and method == "GET":
         return await _api_list_models(send)
+
+    if path == "/admin/api/model-health" and method == "GET":
+        return await _api_model_health(send)
 
     if path == "/admin/api/debates" and method == "GET":
         return await _api_list_debates(send, token)
@@ -349,6 +355,118 @@ async def _api_list_models(send):
         "models": models,
         "total": len(models),
     })
+
+
+async def _api_model_health(send):
+    """GET /admin/api/model-health — Probe de disponibilité des providers LLM."""
+    started = time.perf_counter()
+    provider_models = {}
+    categories_by_provider = {}
+
+    try:
+        from ..services.llm.router import get_llm_router
+        router = get_llm_router()
+        if not getattr(router, "loaded", False):
+            return await _json_response(send, 200, {
+                "status": "error",
+                "message": "LLM Router non chargé",
+                "providers": [],
+                "summary": {
+                    "providers_total": 0,
+                    "providers_ok": 0,
+                    "providers_error": 0,
+                    "providers_disabled": 0,
+                    "models_active": 0,
+                    "duration_ms": 0,
+                },
+            })
+
+        for model in router.models.values():
+            if not getattr(model, "active", True):
+                continue
+            provider_id = model.provider
+            provider_models.setdefault(provider_id, []).append({
+                "id": model.id,
+                "display_name": model.display_name,
+                "category": model.category,
+                "api_model_id": model.api_model_id,
+                "default": model.default,
+            })
+            categories_by_provider.setdefault(provider_id, set()).add(model.category)
+
+        provider_ids = sorted(set(provider_models.keys()) | set(router.get_status().get("providers", [])))
+
+        async def probe(provider_id):
+            probe_started = time.perf_counter()
+            provider = router.get_provider(provider_id)
+            models = provider_models.get(provider_id, [])
+            categories = sorted(categories_by_provider.get(provider_id, set()))
+
+            if not provider:
+                return {
+                    "id": provider_id,
+                    "display_name": _provider_display_name(provider_id),
+                    "status": "error",
+                    "latency_ms": 0,
+                    "details": "Provider non initialisé",
+                    "categories": categories,
+                    "configured_models_count": len(models),
+                    "upstream_models_count": None,
+                    "models": models,
+                }
+
+            try:
+                result = await asyncio.wait_for(provider.test_connectivity(), timeout=12.0)
+                status = result.get("status", "error")
+                details = result.get("details", "")
+                upstream_models = result.get("models_count")
+                if upstream_models is None and isinstance(result.get("models"), list):
+                    upstream_models = len(result["models"])
+            except asyncio.TimeoutError:
+                status = "error"
+                details = "Timeout après 12s"
+                upstream_models = None
+            except Exception:
+                status = "error"
+                details = "Erreur de connectivité"
+                upstream_models = None
+
+            latency_ms = int((time.perf_counter() - probe_started) * 1000)
+            return {
+                "id": provider_id,
+                "display_name": _provider_display_name(provider_id),
+                "status": status,
+                "latency_ms": latency_ms,
+                "details": details,
+                "categories": categories,
+                "configured_models_count": len(models),
+                "upstream_models_count": upstream_models,
+                "models": models,
+            }
+
+        providers = await asyncio.gather(*(probe(provider_id) for provider_id in provider_ids))
+        providers_ok = sum(1 for p in providers if p["status"] == "ok")
+        providers_error = sum(1 for p in providers if p["status"] == "error")
+        providers_disabled = sum(1 for p in providers if p["status"] == "disabled")
+        duration_ms = int((time.perf_counter() - started) * 1000)
+
+        await _json_response(send, 200, {
+            "status": "ok" if providers_error == 0 else "degraded",
+            "providers": providers,
+            "summary": {
+                "providers_total": len(providers),
+                "providers_ok": providers_ok,
+                "providers_error": providers_error,
+                "providers_disabled": providers_disabled,
+                "models_active": sum(len(models) for models in provider_models.values()),
+                "duration_ms": duration_ms,
+            },
+        })
+    except Exception:
+        return await _json_response(send, 500, {
+            "status": "error",
+            "message": "Erreur interne lors du test de disponibilité des modèles",
+        })
 
 
 async def _api_create_debate(send, body, token):
@@ -889,6 +1007,17 @@ def _get_token_client_name(token: str) -> str:
         if info:
             return info.get("client_name", "anonymous")
     return "anonymous"
+
+
+def _provider_display_name(provider_id: str) -> str:
+    """Nom lisible pour les cartes de disponibilité des providers."""
+    names = {
+        "llmaas": "LLMaaS",
+        "openai": "OpenAI",
+        "anthropic": "Anthropic",
+        "google": "Google",
+    }
+    return names.get(provider_id, provider_id.upper())
 
 
 # V1-08 : limite taille body (1 MB)

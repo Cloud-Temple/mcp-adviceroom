@@ -76,3 +76,15 @@ def test_cli_debate_start_is_aligned_with_admin_api():
     assert "/api/v1/debates" not in admin_html
     assert "handle /admin/api/debates/*/stream" in caddyfile
     assert "flush_interval -1" in caddyfile
+
+
+def test_admin_dashboard_model_health_is_wired():
+    admin_html = (BACKEND / "app" / "static" / "admin.html").read_text()
+    admin_api = (BACKEND / "app" / "admin" / "api.py").read_text()
+
+    assert "model-health-grid" in admin_html
+    assert "loadModelHealth(false)" in admin_html
+    assert "api('/model-health')" in admin_html
+    assert "renderModelHealthCard" in admin_html
+    assert 'path == "/admin/api/model-health"' in admin_api
+    assert "async def _api_model_health" in admin_api

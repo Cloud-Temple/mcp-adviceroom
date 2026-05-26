@@ -1,6 +1,7 @@
 import asyncio
 import json
-from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -148,3 +149,62 @@ async def test_admin_cancel_debate_marks_debate_for_cancellation():
     finally:
         debates._active_debates.pop(debate.id, None)
         debates._cancelled_debates.discard(debate.id)
+
+
+@pytest.mark.asyncio
+async def test_admin_model_health_reports_provider_statuses():
+    openai_provider = MagicMock()
+    openai_provider.test_connectivity = AsyncMock(return_value={
+        "status": "ok",
+        "models_count": 126,
+    })
+    anthropic_provider = MagicMock()
+    anthropic_provider.test_connectivity = AsyncMock(return_value={
+        "status": "error",
+        "details": "HTTP 400",
+    })
+
+    router = MagicMock()
+    router.loaded = True
+    router.models = {
+        "gpt-54": SimpleNamespace(
+            id="gpt-54",
+            display_name="GPT-5.4",
+            provider="openai",
+            category="openai",
+            api_model_id="gpt-5.4",
+            default=True,
+            active=True,
+        ),
+        "claude-opus-46": SimpleNamespace(
+            id="claude-opus-46",
+            display_name="Claude Opus 4-6",
+            provider="anthropic",
+            category="anthropic",
+            api_model_id="claude-opus-4-6",
+            default=True,
+            active=True,
+        ),
+    }
+    router.get_status.return_value = {"providers": ["openai", "anthropic"]}
+    router.get_provider.side_effect = {
+        "openai": openai_provider,
+        "anthropic": anthropic_provider,
+    }.get
+
+    with patch("app.services.llm.router.get_llm_router", return_value=router):
+        messages = await _call_admin_api("/admin/api/model-health", "GET")
+
+    status, data = _json_response(messages)
+    providers = {p["id"]: p for p in data["providers"]}
+
+    assert status == 200
+    assert data["status"] == "degraded"
+    assert data["summary"]["providers_ok"] == 1
+    assert data["summary"]["providers_error"] == 1
+    assert data["summary"]["models_active"] == 2
+    assert providers["openai"]["status"] == "ok"
+    assert providers["openai"]["upstream_models_count"] == 126
+    assert providers["openai"]["models"][0]["id"] == "gpt-54"
+    assert providers["anthropic"]["status"] == "error"
+    assert providers["anthropic"]["details"] == "HTTP 400"

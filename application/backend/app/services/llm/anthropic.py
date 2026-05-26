@@ -572,7 +572,7 @@ class AnthropicProvider(BaseLLMProvider):
                 elif response.status_code == 401:
                     return {"status": "error", "details": "Clé API invalide"}
                 else:
-                    return {"status": "ok", "details": f"HTTP {response.status_code}"}
+                    return {"status": "error", "details": f"HTTP {response.status_code}"}
         except Exception as e:
             logger.error(f"✗ Erreur connectivité Anthropic: {e}")
             return {"status": "error", "details": "Erreur de connectivité Anthropic"}

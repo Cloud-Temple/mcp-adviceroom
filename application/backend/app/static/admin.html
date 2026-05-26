@@ -143,6 +143,26 @@ body {
 .stat .value { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
 .stat .label { font-size: 0.65rem; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
 
+/* Model health */
+.model-health-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.model-health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.health-card { padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg2); min-height: 112px; }
+.health-card.ok { border-color: rgba(65, 168, 144, 0.35); background: rgba(65, 168, 144, 0.06); }
+.health-card.error { border-color: rgba(232, 93, 93, 0.45); background: rgba(232, 93, 93, 0.08); }
+.health-card.disabled { border-color: rgba(232, 163, 61, 0.4); background: rgba(232, 163, 61, 0.07); }
+.health-card .hc-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.health-card .hc-name { font-size: 0.94rem; font-weight: 650; color: var(--text); }
+.health-card .hc-status { display: inline-flex; align-items: center; gap: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
+.health-card .hc-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.health-card.ok .hc-dot { background: var(--green); box-shadow: 0 0 10px rgba(65, 168, 144, 0.45); }
+.health-card.error .hc-dot { background: var(--red); box-shadow: 0 0 10px rgba(232, 93, 93, 0.35); }
+.health-card.disabled .hc-dot { background: var(--orange); }
+.health-card .hc-line { font-size: 0.76rem; color: var(--muted); line-height: 1.55; }
+.health-card .hc-line strong { color: var(--text2); font-weight: 600; }
+.health-card .hc-models { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 5px; }
+.health-card .hc-model { font-size: 0.66rem; color: var(--text2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; background: rgba(255,255,255,0.02); }
+.health-summary { font-size: 0.75rem; color: var(--muted); }
+
 /* Tables */
 table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
 th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); }
@@ -625,6 +645,18 @@ input:focus { outline: none; border-color: var(--accent); }
 <div class="content">
     <div class="grid" id="stats-grid"></div>
     <div id="dashboard-last-debate"></div>
+    <div class="card">
+        <div class="model-health-head">
+            <h3 style="margin-bottom:0">🤖 Disponibilité modèles</h3>
+            <div style="display:flex;align-items:center;gap:10px">
+                <span id="model-health-summary" class="health-summary">Non testé</span>
+                <button class="btn btn-sm btn-secondary" id="model-health-refresh" onclick="loadModelHealth(true)">↻ Tester</button>
+            </div>
+        </div>
+        <div id="model-health-grid" class="model-health-grid">
+            <div style="color:var(--muted);font-size:0.85rem">Cliquez sur Tester pour vérifier les providers LLM.</div>
+        </div>
+    </div>
     <div class="card"><h3>🔧 Services</h3><div id="services-info" style="color:var(--muted)">Chargement…</div></div>
 </div>
 </div>
@@ -776,6 +808,7 @@ input:focus { outline: none; border-color: var(--accent); }
 /* ===== Globals ===== */
 let TOKEN='';
 let DEBATES_CACHE=[];
+let MODEL_HEALTH_LOADED=false;
 const API='/admin/api';
 function hdr(){return{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'}}
 async function api(p,o={}){const r=await fetch(API+p,{...o,headers:{...hdr(),...(o.headers||{})}});return r.json()}
@@ -964,6 +997,62 @@ async function loadDashboard(){
         </div>
         ${(health.tools||[]).length?`<div style="margin-top:10px;font-size:0.78rem;color:var(--muted)">Outils : ${(health.tools||[]).map(t=>`<code style="background:var(--surface2);padding:1px 6px;border-radius:3px;font-size:0.75rem">${t}</code>`).join(' ')}</div>`:''}
     `;
+    loadModelHealth(false);
+}
+
+async function loadModelHealth(force){
+    const grid=document.getElementById('model-health-grid');
+    const summary=document.getElementById('model-health-summary');
+    const btn=document.getElementById('model-health-refresh');
+    if(!grid||!summary||!btn)return;
+    if(!force&&MODEL_HEALTH_LOADED)return;
+
+    btn.disabled=true;
+    btn.textContent='⏳ Test…';
+    summary.textContent=force?'Test en cours…':'Mise à jour…';
+    if(force){
+        grid.innerHTML='<div style="color:var(--muted);font-size:0.85rem">Test de disponibilité des providers LLM…</div>';
+    }
+    try{
+        const d=await api('/model-health');
+        const providers=d.providers||[];
+        const s=d.summary||{};
+        summary.textContent=`${s.providers_ok||0}/${s.providers_total||0} providers OK · ${s.models_active||0} modèles · ${s.duration_ms||0}ms`;
+        if(!providers.length){
+            grid.innerHTML='<div style="color:var(--muted);font-size:0.85rem">Aucun provider LLM initialisé.</div>';
+            MODEL_HEALTH_LOADED=true;
+            return;
+        }
+        grid.innerHTML=providers.map(renderModelHealthCard).join('');
+        MODEL_HEALTH_LOADED=true;
+    }catch(e){
+        summary.textContent='Erreur';
+        grid.innerHTML=`<div class="health-card error"><div class="hc-title"><span class="hc-name">Test indisponible</span><span class="hc-status"><span class="hc-dot"></span>Erreur</span></div><div class="hc-line">${esc(e.message)}</div></div>`;
+    }finally{
+        btn.disabled=false;
+        btn.textContent='↻ Tester';
+    }
+}
+
+function renderModelHealthCard(p){
+    const status=p.status||'error';
+    const label=status==='ok'?'OK':(status==='disabled'?'Désactivé':'Erreur');
+    const detail=p.details?`<div class="hc-line"><strong>Détail :</strong> ${esc(p.details)}</div>`:'';
+    const upstream=p.upstream_models_count!=null?`<div class="hc-line"><strong>Upstream :</strong> ${p.upstream_models_count} modèles</div>`:'';
+    const cats=(p.categories||[]).join(', ')||'—';
+    const modelItems=(p.models||[]).slice(0,6).map(m=>`<span class="hc-model">${esc(m.display_name||m.id)}${m.default?' · défaut':''}</span>`).join('');
+    const extra=(p.models||[]).length>6?`<span class="hc-model">+${(p.models||[]).length-6}</span>`:'';
+    return `<div class="health-card ${status}">
+        <div class="hc-title">
+            <span class="hc-name">${esc(p.display_name||p.id)}</span>
+            <span class="hc-status"><span class="hc-dot"></span>${label}</span>
+        </div>
+        <div class="hc-line"><strong>Latence :</strong> ${p.latency_ms||0}ms</div>
+        <div class="hc-line"><strong>Configurés :</strong> ${p.configured_models_count||0} modèles · ${esc(cats)}</div>
+        ${upstream}
+        ${detail}
+        ${(modelItems||extra)?`<div class="hc-models">${modelItems}${extra}</div>`:''}
+    </div>`;
 }
 
 /* ===== DEBATES LIST ===== */

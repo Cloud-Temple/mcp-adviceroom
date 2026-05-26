@@ -201,6 +201,7 @@ La console utilise une API REST dédiée sous `/admin/api/` :
 | GET     | `/admin/api/health`        | read  | État du serveur + LLM Router |
 | GET     | `/admin/api/whoami`        | read  | Identité du token courant    |
 | GET     | `/admin/api/models`        | read  | Modèles LLM disponibles      |
+| GET     | `/admin/api/model-health`  | read  | Disponibilité providers LLM  |
 | GET     | `/admin/api/debates`       | read  | Liste des débats             |
 | POST    | `/admin/api/debates`       | write | Créer et lancer un débat     |
 | GET     | `/admin/api/debates/{id}/stream` | read  | Stream NDJSON temps réel     |

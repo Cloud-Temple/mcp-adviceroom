@@ -21,6 +21,7 @@ versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
 - **OpenAI** : modèle par défaut et registre LLM mis à jour de GPT-5.2 vers GPT-5.4 (`gpt-54` / `gpt-5.4`)
 - **Documentation** : README FR/EN, design d'architecture et commentaires Docker Compose mis à jour pour refléter la surface principale `/admin/api/*`
+- **Dashboard `/admin`** : ajout d'un test de disponibilité des providers/modèles LLM avec latence, statut, détail d'erreur et nombre de modèles configurés/upstream
 
 ---
 
