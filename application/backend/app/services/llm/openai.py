@@ -24,6 +24,20 @@ logger = logging.getLogger(__name__)
 __all__ = ["OpenAIProvider"]
 
 
+def _registry_reasoning_effort(api_model_id: str) -> Optional[str]:
+    """
+    `reasoning_effort` déclaré pour ce modèle dans llm_models.yaml, si présent.
+
+    Rien n'est codé en dur ici : le registre porte déjà les métadonnées
+    par modèle (ModelConfig). Si le registre n'est pas chargé (provider
+    utilisé seul, tests), on ne renvoie rien et le payload est inchangé.
+    """
+    from .router import get_llm_router
+
+    model_cfg = get_llm_router().get_model_by_api_id(api_model_id)
+    return model_cfg.reasoning_effort if model_cfg else None
+
+
 class OpenAIProvider(BaseLLMProvider):
     """
     Adapter OpenAI API.
@@ -51,6 +65,31 @@ class OpenAIProvider(BaseLLMProvider):
             "Content-Type": "application/json",
         }
 
+    @staticmethod
+    def _tools_payload(
+        tools: Optional[List[Dict[str, Any]]],
+        reasoning_effort: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Fragment de payload pour les tools (partagé streaming / non-streaming).
+
+        gpt-5.6-terra refuse les function tools sur /v1/chat/completions :
+        HTTP 400 "Function tools with reasoning_effort are not supported for
+        gpt-5.6-terra in /v1/chat/completions. To use function tools, use
+        /v1/responses or set reasoning_effort to 'none'."
+
+        Le registre déclare `reasoning_effort: "none"` pour ces modèles
+        (llm_models.yaml). On ne l'envoie que lorsqu'il y a des tools et que
+        le registre le demande : les autres modèles gardent leur payload.
+        """
+        if not tools:
+            return {}
+
+        fragment: Dict[str, Any] = {"tools": tools, "tool_choice": "auto"}
+        if reasoning_effort:
+            fragment["reasoning_effort"] = reasoning_effort
+        return fragment
+
     # ─── Chat completion (non-streaming) ─────────────────────
 
     async def chat_completion(
@@ -74,9 +113,9 @@ class OpenAIProvider(BaseLLMProvider):
             "temperature": temperature,
             "stream": False,
         }
-        if tools:
-            payload["tools"] = tools
-            payload["tool_choice"] = "auto"
+        payload.update(
+            self._tools_payload(tools, _registry_reasoning_effort(model))
+        )
         if max_tokens:
             # GPT-5+ utilise max_completion_tokens au lieu de max_tokens
             payload["max_completion_tokens"] = max_tokens
@@ -146,9 +185,9 @@ class OpenAIProvider(BaseLLMProvider):
             "temperature": temperature,
             "stream": True,
         }
-        if tools:
-            payload["tools"] = tools
-            payload["tool_choice"] = "auto"
+        payload.update(
+            self._tools_payload(tools, _registry_reasoning_effort(model))
+        )
         if max_tokens:
             # GPT-5+ utilise max_completion_tokens au lieu de max_tokens
             payload["max_completion_tokens"] = max_tokens

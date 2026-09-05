@@ -48,6 +48,49 @@ class TestOpenAIProvider:
         assert caps["streaming"] is True
 
 
+class TestOpenAIToolsPayload:
+    """Tests du fragment de payload tools (issue #2, gpt-5.6-terra)."""
+
+    TOOLS = [{"type": "function", "function": {"name": "web_search"}}]
+
+    def test_no_tools_no_fragment(self):
+        """Sans tools, aucun champ n'est ajouté au payload."""
+        assert OpenAIProvider._tools_payload(None) == {}
+        assert OpenAIProvider._tools_payload([]) == {}
+
+    def test_tools_without_reasoning_effort(self):
+        """Modèle sans reasoning_effort au registre → payload inchangé."""
+        fragment = OpenAIProvider._tools_payload(self.TOOLS)
+        assert fragment == {"tools": self.TOOLS, "tool_choice": "auto"}
+
+    def test_tools_with_reasoning_effort(self):
+        """Modèle qui l'exige → reasoning_effort ajouté à côté des tools."""
+        fragment = OpenAIProvider._tools_payload(self.TOOLS, "none")
+        assert fragment["tools"] == self.TOOLS
+        assert fragment["tool_choice"] == "auto"
+        assert fragment["reasoning_effort"] == "none"
+
+    def test_reasoning_effort_never_sent_without_tools(self):
+        """Sans tools, reasoning_effort n'est jamais envoyé."""
+        assert OpenAIProvider._tools_payload(None, "none") == {}
+
+    def test_registry_declares_reasoning_effort_for_terra(self):
+        """Le registre porte le réglage : gpt-5.6-terra → "none", gpt-5.4 → None."""
+        from pathlib import Path
+
+        from app.services.llm.router import LLMRouter
+
+        config_path = (
+            Path(__file__).resolve().parents[1]
+            / "app" / "config" / "llm_models.yaml"
+        )
+        router = LLMRouter()
+        router.load(config_path)
+
+        assert router.get_model_by_api_id("gpt-5.6-terra").reasoning_effort == "none"
+        assert router.get_model_by_api_id("gpt-5.4").reasoning_effort is None
+
+
 # ============================================================
 # Tests Anthropic — Traduction de messages
 # ============================================================

@@ -81,6 +81,7 @@ class ModelConfig:
     context_window: int = 128000
     default: bool = False                # Modèle par défaut de la catégorie
     active: bool = True                  # Désactivable par l'admin
+    reasoning_effort: Optional[str] = None  # Envoyé au provider si le modèle l'exige
 
     @property
     def supports_tools(self) -> bool:

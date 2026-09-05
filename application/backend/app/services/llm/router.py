@@ -94,6 +94,7 @@ class LLMRouter:
                 context_window=model_cfg.get("context_window", 128000),
                 default=model_cfg.get("default", False),
                 active=model_cfg.get("active", True),
+                reasoning_effort=model_cfg.get("reasoning_effort"),
             )
 
         # Instancier les providers
@@ -196,6 +197,13 @@ class LLMRouter:
     def get_model_by_id(self, model_id: str) -> Optional[ModelConfig]:
         """Retourne un modèle par son ID."""
         return self.models.get(model_id)
+
+    def get_model_by_api_id(self, api_model_id: str) -> Optional[ModelConfig]:
+        """Retourne un modèle par son ID API (ex: "gpt-5.6-terra")."""
+        for model in self.models.values():
+            if model.api_model_id == api_model_id:
+                return model
+        return None
 
     # ─── Chat completion ────────────────────────────────────
 
