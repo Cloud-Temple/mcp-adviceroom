@@ -24,7 +24,7 @@ def test_release_version_files_are_in_sync():
     frontend_pkg = yaml.safe_load((ROOT / "application" / "frontend" / "package.json").read_text())
     frontend_lock = yaml.safe_load((ROOT / "application" / "frontend" / "package-lock.json").read_text())
 
-    assert root_version == "0.2.0"
+    assert root_version == "0.3.0"
     assert backend_version == root_version
     assert frontend_pkg["version"] == root_version
     assert frontend_lock["version"] == root_version

@@ -3,8 +3,8 @@
 > Structured debates between heterogeneous LLMs — MCP Server + Web Application
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-157%2F157-brightgreen)]()
-[![Version](https://img.shields.io/badge/Version-0.2.0-blue)]()
+[![Tests](https://img.shields.io/badge/Tests-234-brightgreen)]()
+[![Version](https://img.shields.io/badge/Version-0.3.0-blue)]()
 
 [🇫🇷 Version française](README.md)
 
@@ -30,19 +30,19 @@ AdviceRoom orchestrates **structured debates between heterogeneous LLMs**. Users
 | 🎭     | **Personas**            | 5 roles (Pragmatic, Devil's advocate, Risk analyst…)         |
 | 🔀     | **3 debate modes**      | Standard (Within-Round), Parallel (Cross-Round, default), Blitz (~1 min) |
 | 📊     | **Admin dashboard**     | Live monitoring, confidence/stability charts, HTML export    |
-| 🔒     | **Security**            | Bearer auth, owner isolation, WAF Caddy+Coraza, V1.1 audit    |
+| 🔒     | **Security**            | Bearer auth, owner isolation, rate limiting, WAF Caddy+Coraza |
 
 ## Architecture
 
 ```
 WAF (Caddy + Coraza)
-  └── Backend (FastAPI + FastMCP) — Single process
+  └── Backend (FastAPI + MCP SDK v2) — Single process
        ├── Admin API /admin/api/ (Web console, CLI)
        ├── REST API /api/v1/     (REST compatibility/internal MCP)
        ├── MCP /mcp              (AI Agents)
        ├── Admin /admin          (Web console SPA)
        └── Debate Engine
-            ├── LLM Router       (4 providers, 6 models)
+            ├── LLM Router       (4 providers, 8 models)
             ├── DebateOrchestrator (3 phases: OPENING → DEBATE → VERDICT)
             ├── StabilityDetector (adaptive stopping)
             ├── VerdictSynthesizer (consensus / partial / dissensus)
@@ -333,12 +333,17 @@ Multi-LLM debates take time — each LLM must respond at each round. The MCP tim
 ## Security
 
 - **Multi-tenant isolation**: each debate is tied to its creator (`owner`). Non-admin tokens only see their own debates (read = own debates, write = own debates + create, admin = everything). 11 endpoints protected
-- **V1.1 audit**: 22 findings identified, 19 fixed, 2 minor partials, 0 open ([report](DESIGN/SECURITY_AUDIT_V1.md))
+- **Reporting a vulnerability**: see [SECURITY.md](SECURITY.md). Do not open a public issue — use GitHub private vulnerability reporting
+- **V1.1 audit (2026-04-22)**: 22 findings, 19 fixed, 2 minor partials ([report](DESIGN/SECURITY_AUDIT_V1.md))
+- **2026-08-24 audit**: 4 CRITICAL and 5 HIGH identified. **8 of 9 fixed** in 0.3.0 (guessable bootstrap key, stored XSS in the console, Google key in the query string, revoked-token resurrection, missing rate limiting, secrets in plaintext in the repr, XSS in the HTML export). The verdict prompt injection remains, handled as defence in depth — see below
 - **Auth**: Bearer Token + ContextVar on all REST and MCP routes
 - **Validation**: UUID regex, length limits, bounds, whitelists
 - **Infra**: Non-root Dockerfile (UID 1001), internal ports only, HSTS, security headers
 - **WAF**: Caddy + Coraza enabled (OWASP CRS v4.8.0, `SecRuleEngine On`)
-- **Supply chain**: fastmcp≥3.2.0 (4 CVEs fixed), requirements.lock available
+- **Rate limiting**: throughput and concurrent-debate quota per client, across all 3 creation paths (REST, admin, MCP); admin token creation capped. Answers `429` with `Retry-After`
+- **Secrets**: typed `pydantic.SecretStr` — they no longer appear in `repr(settings)`. Note: LLM providers still read their keys from the environment, which a dump would expose
+- **Known limitation — verdict prompt injection**: participant outputs feed the synthesizer's prompt. This is inherent to an LLM-to-LLM architecture: we harden in depth, we do not close it. A debate is not a trust boundary
+- **Supply chain**: `mcp>=2.1.1,<3` declared explicitly and bounded (`fastmcp` removed — never imported), requirements.lock available
 
 ## Documentation
 
@@ -351,7 +356,7 @@ Multi-LLM debates take time — each LLM must respond at each round. The MCP tim
 ```
 mcp-adviceroom/
 ├── application/
-│   ├── backend/           # FastAPI + FastMCP
+│   ├── backend/           # FastAPI + MCP SDK v2
 │   │   ├── app/
 │   │   │   ├── admin/     # Admin console (middleware + API)
 │   │   │   ├── auth/      # Bearer auth (middleware + context + token store)
