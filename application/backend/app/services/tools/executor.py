@@ -202,12 +202,34 @@ class ToolExecutor:
         # On garde les CLÉS des arguments, pas leurs valeurs.
         logger.info(f"🔧 Tool call : {tool_name} → {mcp_tool}(args={sorted(mcp_args)})")
 
+        from mcp import MCPError
+        from mcp.client.streamable_http import CONNECTION_CLOSED
+
         try:
             result = await self._call_mcp_tool(mcp_tool, mcp_args)
             logger.info(f"  ✓ Résultat {tool_name} : {len(str(result))} chars")
             return {"status": "ok", "result": result}
+        except MCPError as e:
+            # SDK MCP v2 : un flux SSE qui se ferme sur HTTP 200 sans réponse
+            # JSON-RPC terminale est désormais résolu en
+            # MCPError(code=CONNECTION_CLOSED) au lieu de laisser l'appel bloqué
+            # jusqu'au watchdog — c'est le motif de la migration v2.
+            # On ne journalise que le code : le message vient du serveur distant
+            # et peut contenir du contenu de débat.
+            if e.code == CONNECTION_CLOSED:
+                logger.warning(
+                    f"  ⚠ Connexion MCP fermée sans réponse pour {tool_name} "
+                    f"(code {e.code})"
+                )
+                return {
+                    "status": "error",
+                    "error": "Connexion à l'outil interrompue avant réponse",
+                }
+            logger.error(f"  ✗ Erreur MCP pour {tool_name} (code {e.code})")
+            return {"status": "error", "error": "Erreur lors de l'exécution de l'outil"}
         except Exception as e:
-            logger.error(f"  ✗ Erreur tool {tool_name}: {e}")
+            # Type d'exception seulement : le message peut porter du contenu.
+            logger.error(f"  ✗ Erreur tool {tool_name}: {type(e).__name__}")
             return {"status": "error", "error": "Erreur temporaire lors de l'exécution de l'outil"}
 
     async def _call_mcp_tool(
@@ -227,40 +249,49 @@ class ToolExecutor:
         Returns:
             Résultat de l'outil (texte ou dict)
         """
+        import httpx2
         from mcp import ClientSession
-        from mcp.client.streamable_http import streamablehttp_client
+        from mcp.client.streamable_http import streamable_http_client
 
         headers = {}
         if self._token:
             headers["Authorization"] = f"Bearer {self._token}"
 
-        async with streamablehttp_client(
-            f"{self._url}/mcp",
+        # SDK MCP v2 : streamable_http_client n'accepte plus headers/timeout/
+        # sse_read_timeout. Ces réglages passent par un client httpx2 fourni.
+        # connect=30s pour l'établissement, read=60s pour le flux SSE — mêmes
+        # valeurs qu'avant la migration.
+        async with httpx2.AsyncClient(
             headers=headers,
-            timeout=30,
-            sse_read_timeout=60,
-        ) as (read, write, _):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
+            timeout=httpx2.Timeout(30.0, read=60.0),
+        ) as http_client:
+            # v2 : le transport ne yield plus que (read, write) — le troisième
+            # élément de v1 (get_session_id) a disparu.
+            async with streamable_http_client(
+                f"{self._url}/mcp",
+                http_client=http_client,
+            ) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
 
-                result = await session.call_tool(tool_name, arguments)
+                    result = await session.call_tool(tool_name, arguments)
 
-                # Extraire le texte de la réponse MCP
-                if getattr(result, "isError", False):
-                    error_msg = "Erreur MCP"
+                    # Extraire le texte de la réponse MCP
+                    if getattr(result, "isError", False):
+                        error_msg = "Erreur MCP"
+                        if result.content:
+                            error_msg = getattr(result.content[0], "text", "") or error_msg
+                        raise RuntimeError(error_msg)
+
+                    text = ""
                     if result.content:
-                        error_msg = getattr(result.content[0], "text", "") or error_msg
-                    raise RuntimeError(error_msg)
+                        text = getattr(result.content[0], "text", "") or ""
 
-                text = ""
-                if result.content:
-                    text = getattr(result.content[0], "text", "") or ""
-
-                # Tenter de parser comme JSON
-                try:
-                    return json.loads(text)
-                except (json.JSONDecodeError, TypeError):
-                    return text
+                    # Tenter de parser comme JSON
+                    try:
+                        return json.loads(text)
+                    except (json.JSONDecodeError, TypeError):
+                        return text
 
     async def test_connectivity(self) -> Dict[str, Any]:
         """
@@ -273,29 +304,34 @@ class ToolExecutor:
             return {"status": "disabled", "message": "MCP Tools non configuré"}
 
         try:
+            import httpx2
             from mcp import ClientSession
-            from mcp.client.streamable_http import streamablehttp_client
+            from mcp.client.streamable_http import streamable_http_client
 
             headers = {}
             if self._token:
                 headers["Authorization"] = f"Bearer {self._token}"
 
-            async with streamablehttp_client(
-                f"{self._url}/mcp",
+            # Cf. _call_mcp_tool : en v2 les timeouts et les headers passent par
+            # le client httpx2. 10s partout — c'est un test de connectivité.
+            async with httpx2.AsyncClient(
                 headers=headers,
-                timeout=10,
-                sse_read_timeout=10,
-            ) as (read, write, _):
-                async with ClientSession(read, write) as session:
-                    await session.initialize()
-                    tools = await session.list_tools()
+                timeout=httpx2.Timeout(10.0, read=10.0),
+            ) as http_client:
+                async with streamable_http_client(
+                    f"{self._url}/mcp",
+                    http_client=http_client,
+                ) as (read, write):
+                    async with ClientSession(read, write) as session:
+                        await session.initialize()
+                        tools = await session.list_tools()
 
-                    tool_names = [t.name for t in tools.tools]
-                    return {
-                        "status": "ok",
-                        "tools_count": len(tool_names),
-                        "tools": tool_names,
-                    }
+                        tool_names = [t.name for t in tools.tools]
+                        return {
+                            "status": "ok",
+                            "tools_count": len(tool_names),
+                            "tools": tool_names,
+                        }
         except Exception as e:
             logger.error(f"✗ Erreur test connectivité MCP Tools: {e}")
             return {"status": "error", "error": "Erreur de connectivité MCP Tools"}

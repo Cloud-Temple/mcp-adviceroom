@@ -98,6 +98,66 @@ class TestToolExecutorNoContentLogging:
         assert "query" in caplog.text
         assert SECRET_QUERY not in caplog.text
 
+class TestToolExecutorConnectionClosed:
+    """
+    Issue #5 — traitement de CONNECTION_CLOSED apporté par le SDK MCP v2.
+
+    En v1, un flux SSE qui se fermait sur HTTP 200 sans réponse JSON-RPC
+    terminale laissait l'appel bloqué jusqu'au watchdog. La v2 synthétise une
+    MCPError(code=CONNECTION_CLOSED). Ces tests couvrent NOTRE traitement de
+    cette erreur, pas le transport du SDK.
+    """
+
+    @pytest.mark.asyncio
+    async def test_connection_closed_returns_bounded_error(self, executor, caplog):
+        """Un CONNECTION_CLOSED produit une erreur explicite, pas une attente."""
+        from mcp import MCPError
+        from mcp.client.streamable_http import CONNECTION_CLOSED
+
+        with patch.object(
+            executor,
+            "_call_mcp_tool",
+            new=AsyncMock(side_effect=MCPError(
+                code=CONNECTION_CLOSED,
+                message="SSE stream ended without a response",
+            )),
+        ):
+            with caplog.at_level(logging.WARNING):
+                result = await executor.execute_tool_call(
+                    "web_search", {"query": SECRET_QUERY}
+                )
+
+        assert result["status"] == "error"
+        # Message distinct d'une erreur générique : l'appelant peut différencier
+        # une connexion interrompue d'un échec d'exécution.
+        assert "interrompue" in result["error"]
+        # Le code est tracé pour le diagnostic...
+        assert str(CONNECTION_CLOSED) in caplog.text
+        # ... mais ni la query ni le message du serveur distant.
+        assert SECRET_QUERY not in caplog.text
+        assert "SSE stream ended" not in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_other_mcp_error_is_distinguished(self, executor, caplog):
+        """Une MCPError qui n'est pas CONNECTION_CLOSED reste une erreur générique."""
+        from mcp import MCPError
+
+        with patch.object(
+            executor,
+            "_call_mcp_tool",
+            new=AsyncMock(side_effect=MCPError(code=-32601, message="Method not found")),
+        ):
+            with caplog.at_level(logging.ERROR):
+                result = await executor.execute_tool_call("calculator", {"expr": "1+1"})
+
+        assert result["status"] == "error"
+        assert "interrompue" not in result["error"]
+        assert "-32601" in caplog.text
+        assert "Method not found" not in caplog.text
+
+
+class TestToolExecutorErrorPaths:
+
     @pytest.mark.asyncio
     async def test_tool_error_does_not_leak_arguments(self, executor, caplog, capsys):
         """Le chemin d'erreur ne doit pas non plus exposer les arguments."""

@@ -3,7 +3,7 @@
 Middlewares ASGI : authentification et logging.
 
 Pile d'exécution (ordre) :
-    LoggingMiddleware → AdminMiddleware → HealthCheckMiddleware → AuthMiddleware → FastAPI+FastMCP
+    LoggingMiddleware → AdminMiddleware → HealthCheckMiddleware → AuthMiddleware → FastAPI+MCPServer
 
 Pattern identique au starter-kit Cloud Temple.
 """

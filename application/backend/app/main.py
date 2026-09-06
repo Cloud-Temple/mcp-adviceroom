@@ -2,10 +2,10 @@
 AdviceRoom — Point d'entrée principal.
 
 Assemble la pile de 5 middlewares ASGI Cloud Temple :
-    LoggingMiddleware → AdminMiddleware → HealthCheckMiddleware → AuthMiddleware → FastAPI+FastMCP
+    LoggingMiddleware → AdminMiddleware → HealthCheckMiddleware → AuthMiddleware → FastAPI+MCPServer
 
 Architecture hybride : FastAPI pour les routes REST (débats, providers, export)
-+ FastMCP pour les outils MCP (agents IA) + Admin pour la console web.
++ MCPServer pour les outils MCP (agents IA) + Admin pour la console web.
 
 Ref: starter-kit/README.md §2 (Architecture — La règle des 3 couches + 5 middlewares)
 """
@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from .config.settings import get_settings
 from .routers.debates import router as debates_router
@@ -29,17 +29,14 @@ from .routers.providers import router as providers_router
 settings = get_settings()
 
 # =============================================================================
-# FastMCP instance (outils MCP pour les agents IA)
+# MCPServer instance (outils MCP pour les agents IA)
 # =============================================================================
 
-mcp = FastMCP(
-    name="adviceroom",
-    host=settings.backend_host,
-    port=settings.backend_port,
-    # streamable_http_path="/" évite le double préfixe /mcp/mcp
-    # (le défaut FastMCP est "/mcp", combiné avec mount("/mcp") → /mcp/mcp)
-    streamable_http_path="/",
-)
+# SDK MCP v2 : la classe FastMCP a été renommée MCPServer, et les paramètres de
+# transport (host, port, streamable_http_path) ne sont plus acceptés par le
+# constructeur. Ils sont désormais passés à streamable_http_app() — voir
+# _new_streamable_http_app() ci-dessous.
+mcp = MCPServer(name="adviceroom")
 
 # Importer les outils MCP (ils s'auto-enregistrent via @mcp.tool())
 from .mcp.tools import register_tools  # noqa: E402
@@ -47,11 +44,11 @@ register_tools(mcp)
 
 class StreamableHTTPAppProxy:
     """
-    Stable mounted ASGI app that can swap its FastMCP sub-app at startup.
+    Stable mounted ASGI app that can swap its MCP sub-app at startup.
 
-    FastMCP's StreamableHTTPSessionManager can only be run once per instance.
-    Recreating the sub-app for each parent lifespan keeps production startup
-    correct and avoids brittle ASGI restart/test-client cycles.
+    A StreamableHTTPSessionManager can only be run once. Rebuilding the
+    sub-app for each parent lifespan keeps production startup correct and
+    avoids brittle ASGI restart/test-client cycles.
     """
 
     def __init__(self, app_factory):
@@ -67,14 +64,20 @@ class StreamableHTTPAppProxy:
 
 
 def _new_streamable_http_app():
-    # FastMCP caches the StreamableHTTPSessionManager internally. Its manager
-    # cannot be restarted after shutdown, so a new ASGI app also needs a new
-    # manager for each parent lifespan.
-    mcp._session_manager = None
-    return mcp.streamable_http_app()
+    # SDK MCP v2 : streamable_http_app() construit un NOUVEAU
+    # StreamableHTTPSessionManager à chaque appel et l'attache au lifespan du
+    # Starlette retourné. Le contournement v1 — remettre le manager mis en cache
+    # à None avant de reconstruire l'app — n'a donc plus d'objet.
+    #
+    # streamable_http_path="/" évite le double préfixe /mcp/mcp : le défaut du
+    # SDK est "/mcp", et l'app est déjà montée sur "/mcp" plus bas.
+    return mcp.streamable_http_app(
+        streamable_http_path="/",
+        host=settings.backend_host,
+    )
 
 
-# FastMCP's streamable HTTP app owns a lifespan that initializes the session
+# The streamable HTTP app owns a lifespan that initializes the session
 # manager task group. Starlette does not run mounted sub-app lifespans, so the
 # parent FastAPI app must enter it explicitly.
 mcp_app = StreamableHTTPAppProxy(_new_streamable_http_app)
@@ -128,9 +131,9 @@ fastapi_app = FastAPI(
 fastapi_app.include_router(debates_router, prefix="/api/v1")
 fastapi_app.include_router(providers_router, prefix="/api/v1")
 
-# Monter FastMCP sur /mcp
-# Le streamable_http_path="/" dans le constructeur FastMCP ci-dessus
-# évite le double préfixe /mcp/mcp (le défaut FastMCP est "/mcp")
+# Monter l'app MCP sur /mcp
+# Le streamable_http_path="/" passé à streamable_http_app() ci-dessus
+# évite le double préfixe /mcp/mcp (le défaut du SDK est "/mcp")
 fastapi_app.mount("/mcp", mcp_app)
 
 
@@ -175,7 +178,7 @@ def create_app():
     Crée l'application ASGI complète avec les middlewares.
 
     Pile d'exécution (ext → int) :
-        LoggingMiddleware → AdminMiddleware → HealthCheckMiddleware → AuthMiddleware → FastAPI+FastMCP
+        LoggingMiddleware → AdminMiddleware → HealthCheckMiddleware → AuthMiddleware → FastAPI+MCPServer
 
     FastAPI est l'innermost app (gère /api/v1/* et /mcp).
     Les middlewares interceptent /admin, /health, et injectent l'auth.
