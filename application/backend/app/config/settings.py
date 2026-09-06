@@ -8,7 +8,7 @@ import hmac
 from functools import lru_cache
 from typing import Optional
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings
 
 
@@ -32,37 +32,52 @@ class Settings(BaseSettings):
     # uniquement par les tokens du Token Store S3. Toute comparaison doit passer
     # par bootstrap_key_matches(), qui refuse une clé vide — sans quoi
     # hmac.compare_digest("", "") authentifierait un porteur sans secret.
-    admin_bootstrap_key: str = Field(
-        default="",
+    admin_bootstrap_key: SecretStr = Field(
+        default=SecretStr(""),
         validation_alias=AliasChoices(
             "ADMIN_BOOTSTRAP_KEY",
             "ADVICEROOM_BOOTSTRAP_KEY",
         ),
     )
 
+    # ------------------------------------------------------------------
+    # SECRETS — HIGH #3 de l'audit du 24/08/2026
+    #
+    # Typés SecretStr : en `str` nu, `repr(settings)` les imprimait EN CLAIR.
+    # Une trace d'exception, un log de debug ou un dump de configuration
+    # suffisait donc à les exposer. SecretStr affiche `**********` et impose
+    # `.get_secret_value()` pour lire la valeur — ce qui rend chaque lecture
+    # d'un secret visible à la relecture du code.
+    #
+    # Portée : cela protège le repr des settings, PAS l'environnement du
+    # processus. Les providers LLM lisent d'ailleurs encore leurs clés via
+    # os.getenv() (voir services/llm/*.py) : un dump d'environnement resterait
+    # une fuite. C'est une atténuation, pas une élimination.
+    # ------------------------------------------------------------------
+
     # --- LLMaaS (Cloud Temple SecNumCloud) ---
     llmaas_api_url: str = "https://api.ai.cloud-temple.com"
-    llmaas_api_key: str = ""
+    llmaas_api_key: SecretStr = SecretStr("")
     llmaas_default_model: str = "gpt-oss:120b"
 
     # --- Google Gemini ---
-    google_api_key: str = ""
+    google_api_key: SecretStr = SecretStr("")
     google_default_model: str = "gemini-3.1-pro-preview"
 
     # --- OpenAI ---
-    openai_api_key: str = ""
+    openai_api_key: SecretStr = SecretStr("")
     openai_api_url: str = "https://api.openai.com/v1"
     openai_default_model: str = "gpt-5.4"
 
     # --- Anthropic ---
-    anthropic_api_key: str = ""
+    anthropic_api_key: SecretStr = SecretStr("")
     anthropic_api_url: str = "https://api.anthropic.com"
     anthropic_default_model: str = "claude-opus-4.6"
 
     # --- S3 Storage ---
     s3_endpoint: str = ""
-    s3_access_key: str = ""
-    s3_secret_key: str = ""
+    s3_access_key: SecretStr = SecretStr("")
+    s3_secret_key: SecretStr = SecretStr("")
     s3_bucket: str = "adviceroom"
     s3_region: str = "fr1"
 
@@ -80,7 +95,7 @@ class Settings(BaseSettings):
 
     # --- MCP Tools (outils disponibles pour les LLMs pendant le débat) ---
     mcp_tools_url: str = ""
-    mcp_tools_token: str = ""
+    mcp_tools_token: SecretStr = SecretStr("")
 
     # --- Auth ---
     auth_service_url: str = "http://auth:8001"
@@ -95,7 +110,7 @@ class Settings(BaseSettings):
     @property
     def bootstrap_enabled(self) -> bool:
         """True si une clé de bootstrap admin est configurée."""
-        return bool(self.admin_bootstrap_key)
+        return bool(self.admin_bootstrap_key.get_secret_value())
 
     def bootstrap_key_matches(self, token: str) -> bool:
         """
@@ -106,9 +121,10 @@ class Settings(BaseSettings):
         AVANT tout appel à compare_digest — car compare_digest("", "") est vrai
         et accorderait sinon un accès admin total sans aucun secret.
         """
-        if not token or not self.admin_bootstrap_key:
+        key = self.admin_bootstrap_key.get_secret_value()
+        if not token or not key:
             return False
-        return hmac.compare_digest(token, self.admin_bootstrap_key)
+        return hmac.compare_digest(token, key)
 
 
 @lru_cache()

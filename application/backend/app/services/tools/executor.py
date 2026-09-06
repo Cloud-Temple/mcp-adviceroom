@@ -141,7 +141,7 @@ class ToolExecutor:
         """Initialise le tool executor depuis les settings."""
         settings = get_settings()
         self._url = settings.mcp_tools_url.rstrip("/") if settings.mcp_tools_url else ""
-        self._token = settings.mcp_tools_token
+        self._token = settings.mcp_tools_token.get_secret_value()
         self._available = bool(self._url and self._token)
 
         if self._available:

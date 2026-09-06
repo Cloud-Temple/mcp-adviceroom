@@ -56,7 +56,7 @@ class S3DebateStore:
         settings = get_settings()
         self._bucket = settings.s3_bucket
         self._available = bool(
-            settings.s3_endpoint and settings.s3_access_key and settings.s3_secret_key
+            settings.s3_endpoint and settings.s3_access_key.get_secret_value() and settings.s3_secret_key.get_secret_value()
         )
 
         if not self._available:
@@ -73,8 +73,8 @@ class S3DebateStore:
         self._client_data = boto3.client(
             "s3",
             endpoint_url=settings.s3_endpoint,
-            aws_access_key_id=settings.s3_access_key,
-            aws_secret_access_key=settings.s3_secret_key,
+            aws_access_key_id=settings.s3_access_key.get_secret_value(),
+            aws_secret_access_key=settings.s3_secret_key.get_secret_value(),
             config=config_v2,
         )
 
@@ -88,8 +88,8 @@ class S3DebateStore:
         self._client_meta = boto3.client(
             "s3",
             endpoint_url=settings.s3_endpoint,
-            aws_access_key_id=settings.s3_access_key,
-            aws_secret_access_key=settings.s3_secret_key,
+            aws_access_key_id=settings.s3_access_key.get_secret_value(),
+            aws_secret_access_key=settings.s3_secret_key.get_secret_value(),
             config=config_v4,
         )
 

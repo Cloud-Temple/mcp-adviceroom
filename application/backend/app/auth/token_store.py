@@ -111,8 +111,8 @@ class TokenStore:
             self._s3_client = boto3.client(
                 "s3",
                 endpoint_url=self.settings.s3_endpoint,
-                aws_access_key_id=self.settings.s3_access_key,
-                aws_secret_access_key=self.settings.s3_secret_key,
+                aws_access_key_id=self.settings.s3_access_key.get_secret_value(),
+                aws_secret_access_key=self.settings.s3_secret_key.get_secret_value(),
                 region_name=self.settings.s3_region,
                 config=config,
             )
