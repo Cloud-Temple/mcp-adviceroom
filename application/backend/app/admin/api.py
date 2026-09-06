@@ -32,6 +32,12 @@ from pathlib import Path
 
 from ..config.settings import get_settings
 from ..auth.token_store import TokenStorePersistenceError, get_token_store
+from ..services.rate_limit import (
+    RateLimitExceeded,
+    enforce_active_debate_quota,
+    get_debate_creation_limiter,
+    get_token_creation_limiter,
+)
 from ..auth.middleware import get_activity_log
 
 
@@ -118,7 +124,7 @@ async def handle_admin_api(scope, receive, send, mcp):
 
     if path == "/admin/api/tokens" and method == "POST":
         body = await _read_body(receive)
-        return await _api_create_token(send, body)
+        return await _api_create_token(send, body, token)
 
     if path.startswith("/admin/api/tokens/") and method == "DELETE":
         hash_prefix = path.split("/")[-1]
@@ -236,8 +242,21 @@ async def _api_list_tokens(send):
 _VALID_PERMISSIONS = {"read", "write", "admin"}
 
 
-async def _api_create_token(send, body):
+async def _api_create_token(send, body, token=""):
     """POST /admin/api/tokens — Créer un token."""
+    # HIGH #5 : un accès admin compromis produisait des tokens sans limite.
+    # La clé est l'admin appelant, afin qu'un compte abusif ne bloque pas
+    # les autres.
+    try:
+        get_token_creation_limiter().check(_get_token_client_name(token))
+    except RateLimitExceeded as exc:
+        headers = [(b"retry-after", str(exc.retry_after).encode())] if exc.retry_after else None
+        return await _json_response(
+            send, 429,
+            {"status": "error", "message": exc.message},
+            extra_headers=headers,
+        )
+
     store = get_token_store()
     if not store:
         return await _json_response(
@@ -514,6 +533,20 @@ async def _api_create_debate(send, body, token):
         get_orchestrator,
     )
     import asyncio
+
+    # HIGH #2 : mêmes garde-fous que la voie REST et que l'outil MCP — trois
+    # portes d'entrée vers le même moteur, donc un contrôle identique aux trois.
+    _client_name = _get_token_client_name(token)
+    try:
+        get_debate_creation_limiter().check(_client_name)
+        enforce_active_debate_quota(_active_debates.values(), _client_name)
+    except RateLimitExceeded as exc:
+        _hdrs = [(b"retry-after", str(exc.retry_after).encode())] if exc.retry_after else None
+        return await _json_response(
+            send, 429,
+            {"status": "error", "message": exc.message},
+            extra_headers=_hdrs,
+        )
 
     if not question or len(question) < 5 or len(question) > _MAX_QUESTION_LENGTH:
         return await _json_response(send, 400, {
@@ -1055,15 +1088,24 @@ async def _read_body(receive) -> bytes:
     return body
 
 
-async def _json_response(send, status, data):
-    """Envoie une réponse JSON."""
+async def _json_response(send, status, data, extra_headers=None):
+    """
+    Envoie une réponse JSON.
+
+    extra_headers : liste de tuples (bytes, bytes) ajoutés à la réponse.
+    Nécessaire pour `Retry-After` sur les réponses 429 — sans lui, le client
+    ignore combien de temps attendre et réessaie à l'aveugle.
+    """
     body = json.dumps(data, default=str).encode()
+    headers = [
+        (b"content-type", b"application/json"),
+        (b"content-length", str(len(body)).encode()),
+    ]
+    if extra_headers:
+        headers.extend(extra_headers)
     await send({
         "type": "http.response.start",
         "status": status,
-        "headers": [
-            (b"content-type", b"application/json"),
-            (b"content-length", str(len(body)).encode()),
-        ],
+        "headers": headers,
     })
     await send({"type": "http.response.body", "body": body})

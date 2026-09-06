@@ -27,6 +27,12 @@ versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
 ### Sécurité
 
+Correction des findings **HIGH #2** et **#5** de l'audit du 24/08/2026 — absence de contrôle de débit.
+
+- **Exhaustion du budget LLM** : aucune limite n'encadrait la création de débats, ouverte par **trois** voies (REST `/api/v1/debates`, admin `/admin/api/debates`, outil MCP `debate_create`). Chaque débat mobilise jusqu'à 5 LLMs plus un synthétiseur, sur des questions pouvant atteindre 200 000 caractères : un porteur de token valide pouvait épuiser le budget en boucle. Deux gardes complémentaires sont posées sur les trois voies — un **débit** (fenêtre glissante par client, 10/min par défaut) contre les rafales, et un **quota de débats simultanés** (5 par défaut) contre l'accumulation lente qu'un débit seul laisserait passer. Le refus renvoie **429** avec `Retry-After`, et précède tout travail : aucune dépense LLM n'est engagée. Un test structurel échoue si une quatrième voie apparaissait sans garde
+- **Création de tokens admin non limitée** : un accès admin compromis produisait des tokens sans fin. Plafond de 10/min par administrateur appelant, également en **429**
+- Les trois seuils sont configurables (`RATE_LIMIT_DEBATES_PER_MINUTE`, `RATE_LIMIT_MAX_ACTIVE_DEBATES`, `RATE_LIMIT_TOKENS_PER_MINUTE`) ; `0` désactive la garde correspondante
+
 Correction des 4 findings **CRITICAL** de l'audit de sécurité du 24/08/2026. Chaque correctif est verrouillé par des tests dont l'échec sur le code vulnérable a été vérifié.
 
 - **Clé de bootstrap admin devinable** (`config/settings.py`) : `admin_bootstrap_key` valait par défaut `"changeme-in-production"`. Le dépôt étant public, tout déploiement ayant omis de définir la variable accordait un **accès admin total** à une valeur connue de quiconque lit le code. Le défaut devient vide, ce qui **désactive** le bootstrap (fail-closed) : l'accès admin passe alors uniquement par les tokens du Token Store S3. Les 6 sites de comparaison sont centralisés dans `Settings.bootstrap_key_matches()`, qui refuse les valeurs vides — sans quoi `hmac.compare_digest("", "")` aurait authentifié un porteur sans aucun secret. L'avertissement de démarrage est déplacé dans `create_app()` : il vivait dans `main()`, qui n'est jamais exécuté puisque le conteneur démarre `uvicorn app.main:app`

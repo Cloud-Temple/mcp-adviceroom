@@ -31,6 +31,11 @@ from pydantic import BaseModel, Field
 
 from ..auth.context import require_read, require_write
 from ..services.debate.orchestrator import DebateOrchestrator
+from ..services.rate_limit import (
+    RateLimitExceeded,
+    enforce_active_debate_quota,
+    get_debate_creation_limiter,
+)
 from ..services.debate.models import Debate, DebateStatus, UserAnswer
 from ..services.storage.s3_store import get_debate_store
 from ..services.storage.serializer import (
@@ -182,6 +187,16 @@ async def create_debate(
 
     Requiert un token avec permission 'write' ou 'admin'.
     """
+    # HIGH #2 : débit + quota AVANT tout travail. Un débat engage jusqu'à 5 LLMs
+    # plus un synthétiseur — le refus doit précéder la moindre dépense.
+    client_name = _get_owner_name(_token)
+    try:
+        get_debate_creation_limiter().check(client_name)
+        enforce_active_debate_quota(_active_debates.values(), client_name)
+    except RateLimitExceeded as exc:
+        headers = {"Retry-After": str(exc.retry_after)} if exc.retry_after else None
+        raise HTTPException(status_code=429, detail=exc.message, headers=headers)
+
     orchestrator = get_orchestrator()
 
     # V1-03 : borner max_rounds
