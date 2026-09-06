@@ -55,9 +55,9 @@ def _get_orchestrator():
 
 def register_tools(mcp):
     """
-    Enregistre tous les outils MCP AdviceRoom sur l'instance FastMCP.
+    Enregistre tous les outils MCP AdviceRoom sur l'instance MCPServer.
 
-    Appelé depuis main.py après la création de l'instance FastMCP.
+    Appelé depuis main.py après la création de l'instance MCPServer.
     """
 
     # ── debate_create (write) ────────────────────────────

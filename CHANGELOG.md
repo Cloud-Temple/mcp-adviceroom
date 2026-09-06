@@ -7,6 +7,15 @@ versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
+### Modifié
+
+- **Migration du SDK MCP Python v1 → v2** ([#5](https://github.com/Cloud-Temple/mcp-adviceroom/issues/5)) : `mcp 1.27.0` → `mcp>=2.1.1,<3`
+  - **Serveur** : `FastMCP` devient `MCPServer` (`mcp.server.mcpserver`). Les paramètres de transport (`host`, `port`, `streamable_http_path`) n'étant plus acceptés par le constructeur, ils sont passés à `streamable_http_app()`
+  - **Simplification** : le contournement v1 qui remettait à `None` le `StreamableHTTPSessionManager` mis en cache est supprimé. En v2, `streamable_http_app()` construit un nouveau manager à chaque appel et l'attache au lifespan du `Starlette` retourné
+  - **Client** : `streamablehttp_client` devient `streamable_http_client`. Les paramètres `headers`, `timeout` et `sse_read_timeout` sont supprimés au profit d'un `httpx2.AsyncClient` fourni par l'appelant, et le transport ne renvoie plus que `(read, write)` — le `get_session_id` de v1 disparaît
+  - **Robustesse** : un flux SSE qui se ferme sur HTTP 200 sans réponse JSON-RPC terminale remonte désormais une `MCPError(code=CONNECTION_CLOSED)` bornée et distincte d'un échec d'exécution, au lieu de laisser l'appel d'outil bloqué jusqu'au watchdog
+  - **Dépendances** : `fastmcp>=3.2.0` est retiré — ce paquet tiers n'était jamais importé et sa contrainte `mcp<2.0` bloquait la migration. `mcp` est désormais déclaré explicitement, avec une borne haute `<3`. `httpx2` arrive comme dépendance du SDK et coexiste avec `httpx`, utilisé par les providers LLM
+
 ### Corrigé
 
 - **Providers LLM — Claude Opus 5 et GPT-5.6 Terra** ([#2](https://github.com/Cloud-Temple/mcp-adviceroom/issues/2)) : les deux modèles échouaient en HTTP 400 avant toute génération, le payload contenant systématiquement `temperature`. Les contraintes sont désormais portées par le registre des modèles (`ModelConfig.supports_temperature` et `ModelConfig.extra_params`, résolus par `LLMRouter`), et non par des heuristiques de préfixe de nom
