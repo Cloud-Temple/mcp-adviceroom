@@ -97,7 +97,7 @@ class AuthMiddleware:
         settings = get_settings()
 
         # Bootstrap key → admin total (comparaison constante contre timing attacks)
-        if hmac.compare_digest(token, settings.admin_bootstrap_key):
+        if settings.bootstrap_key_matches(token):
             return {
                 "client_name": "admin",
                 "permissions": ["admin", "read", "write"],

@@ -187,6 +187,17 @@ def create_app():
     from .admin.middleware import AdminMiddleware
     from .auth.token_store import init_token_store
 
+    # Avertissement bootstrap admin. Placé ICI et non dans main() : le
+    # Dockerfile démarre `uvicorn app.main:app`, donc main() n'est jamais
+    # exécuté en production et l'avertissement qui s'y trouvait ne s'affichait
+    # jamais là où il comptait.
+    if not settings.bootstrap_enabled:
+        import logging
+        logging.getLogger(__name__).warning(
+            "⚠ ADMIN_BOOTSTRAP_KEY non définie — bootstrap admin DÉSACTIVÉ. "
+            "L'accès admin repose uniquement sur les tokens du Token Store S3."
+        )
+
     # Initialiser le Token Store S3 (doit être fait AVANT le premier request)
     init_token_store()
 
@@ -284,13 +295,8 @@ def main():
     # Bannière
     print("\n" + _build_banner() + "\n", file=sys.stderr)
 
-    # Warning bootstrap key par défaut
-    if settings.admin_bootstrap_key == "changeme-in-production":
-        print(
-            "⚠️  ATTENTION : ADMIN_BOOTSTRAP_KEY est la valeur par défaut !\n"
-            "   → Changez-la dans .env AVANT tout déploiement en production.\n",
-            file=sys.stderr,
-        )
+    # L'avertissement sur le bootstrap admin est émis par create_app(), qui est
+    # le seul chemin commun aux deux modes de démarrage (uvicorn et python -m app).
 
     # V1-13 : init_token_store() supprimé ici (déjà fait dans create_app())
 

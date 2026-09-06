@@ -6,19 +6,39 @@ Fournit des fixtures réutilisables pour :
 - Des participants de test
 - Des positions de test
 """
-import pytest
-from unittest.mock import patch
-
-from app.services.debate.models import Participant
-
+import os
 
 # ============================================================
 # Auth helpers pour les tests (V1-01 : toutes les routes sont authentifiées)
 # ============================================================
 
-# Le bootstrap key par défaut dans settings.py
-TEST_BOOTSTRAP_KEY = "changeme-in-production"
+# Clé de bootstrap propre aux tests. Elle est INJECTÉE dans l'environnement,
+# et non héritée d'un défaut de settings.py : ce défaut valait auparavant
+# "changeme-in-production", et les tests s'authentifiaient donc avec la valeur
+# vulnérable elle-même. Supprimer ce défaut aurait fait échouer la suite.
+#
+# L'injection est FORCÉE (et non setdefault) pour que les tests soient
+# déterministes quel que soit l'environnement : sans cela, un .env de
+# déploiement portant une vraie ADMIN_BOOTSTRAP_KEY faisait échouer en 401 tous
+# les tests d'API — c'était le cas en exécution Docker.
+#
+# Doit précéder tout import de `app.*` : get_settings() est @lru_cache, donc la
+# première lecture de l'environnement est définitive.
+TEST_BOOTSTRAP_KEY = "test-bootstrap-key-not-for-production"
+os.environ["ADMIN_BOOTSTRAP_KEY"] = TEST_BOOTSTRAP_KEY
+os.environ.pop("ADVICEROOM_BOOTSTRAP_KEY", None)  # alias legacy, sinon prioritaire
+
 TEST_AUTH_HEADERS = {"Authorization": f"Bearer {TEST_BOOTSTRAP_KEY}"}
+
+import pytest  # noqa: E402
+from unittest.mock import patch  # noqa: E402
+
+from app.config.settings import get_settings  # noqa: E402
+from app.services.debate.models import Participant  # noqa: E402
+
+# Le cache a pu être amorcé par un import antérieur (collecte pytest) : on le
+# vide pour que la clé de test ci-dessus soit bien celle qui s'applique.
+get_settings.cache_clear()
 
 
 # ============================================================
