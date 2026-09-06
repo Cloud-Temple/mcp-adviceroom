@@ -114,6 +114,26 @@ def register_tools(mcp):
             _run_debate_task,
         )
 
+        # HIGH #2 : troisième porte d'entrée vers le même moteur — mêmes
+        # garde-fous que les voies REST et admin. Une seule voie non protégée
+        # suffirait à annuler la protection des deux autres.
+        from ..auth.context import get_current_client_name
+        from ..services.rate_limit import (
+            RateLimitExceeded,
+            enforce_active_debate_quota,
+            get_debate_creation_limiter,
+        )
+        client_name = get_current_client_name()
+        try:
+            get_debate_creation_limiter().check(client_name)
+            enforce_active_debate_quota(_active_debates.values(), client_name)
+        except RateLimitExceeded as exc:
+            # Pas de code HTTP ici : l'agent MCP reçoit une erreur structurée.
+            result = {"status": "error", "message": exc.message}
+            if exc.retry_after:
+                result["retry_after_seconds"] = exc.retry_after
+            return result
+
         orchestrator = _get_orchestrator()
 
         # V1-03 : borner max_rounds
@@ -132,9 +152,9 @@ def register_tools(mcp):
         if len(debate.participants) < 2:
             return {"status": "error", "message": "Au moins 2 participants valides requis."}
 
-        # Enregistrer le propriétaire du débat
-        from ..auth.context import get_current_client_name
-        debate.owner = get_current_client_name()
+        # Enregistrer le propriétaire du débat (même identité que la clé de
+        # rate limiting ci-dessus)
+        debate.owner = client_name
 
         _active_debates[debate.id] = debate
         _debate_events[debate.id] = asyncio.Queue()

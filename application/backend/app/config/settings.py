@@ -69,6 +69,15 @@ class Settings(BaseSettings):
     # --- Redis ---
     redis_url: str = "redis://redis:6379/0"
 
+    # --- Rate limiting (HIGH #2 et #5, audit du 24/08/2026) ---
+    # Un débat mobilise jusqu'à 5 LLMs plus un synthétiseur : sans plafond, un
+    # porteur de token valide peut épuiser le budget LLM. Les valeurs par défaut
+    # visent un usage humain confortable tout en bornant l'abus.
+    # Mettre 0 désactive la garde correspondante (déconseillé en production).
+    rate_limit_debates_per_minute: int = 10   # créations de débats / min / client
+    rate_limit_max_active_debates: int = 5    # débats simultanés / client
+    rate_limit_tokens_per_minute: int = 10    # créations de tokens admin / min
+
     # --- MCP Tools (outils disponibles pour les LLMs pendant le débat) ---
     mcp_tools_url: str = ""
     mcp_tools_token: str = ""
