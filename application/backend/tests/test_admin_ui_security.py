@@ -117,3 +117,61 @@ class TestEscapeHelper:
             if line.startswith("function esc(")
         )
         assert esc_line.index("&amp;") < esc_line.index("&lt;")
+
+
+class TestMarkdownExportLinks:
+    """
+    HIGH #4 — XSS dans le fichier HTML exporté par `mdExport()`.
+
+    Trois défauts distincts :
+
+    1. Une substitution `/\\"/g → '"'` réinjectait des guillemets bruts JUSTE
+       APRÈS `esc()`, annulant l'échappement et rouvrant l'injection
+       d'attribut. Elle n'était pas mentionnée dans l'audit.
+    2. L'URL du lien était interpolée telle quelle dans `href`, ce qui laissait
+       passer `javascript:` — un href parfaitement valide qui exécute du code
+       au clic, et qu'échapper les chevrons ne bloque pas.
+    3. Absence de `rel="noopener"`, alors que le fichier exporté s'ouvre hors
+       de toute origine de confiance.
+    """
+
+    def test_escaping_is_not_undone(self, admin_source):
+        """La substitution qui réinjectait des guillemets bruts doit rester supprimée."""
+        body = _function_body(admin_source, "mdExport")
+        assert r"""replace(/\\"/g,'"')""" not in body, (
+            "mdExport réintroduit des guillemets bruts après esc() — "
+            "l'échappement est annulé et l'injection d'attribut redevient possible."
+        )
+
+    def test_link_url_is_validated(self, admin_source):
+        """L'URL passe par safeHref et n'est jamais interpolée directement."""
+        assert "function safeHref(" in admin_source
+
+        body = _function_body(admin_source, "mdExport")
+        assert "safeHref(" in body, "mdExport n'appelle pas safeHref"
+        # L'ancienne forme interpolait le groupe capturé dans href.
+        assert '<a href="$2"' not in body, (
+            "URL interpolée telle quelle dans href — protocole non validé"
+        )
+
+    def test_safe_href_allows_only_known_protocols(self, admin_source):
+        """
+        Whitelist et non blacklist.
+
+        Une blacklist de `javascript:` se contourne par la casse, les
+        caractères de contrôle ou des schémas exotiques ; seule une liste
+        d'autorisation tient.
+        """
+        body = _function_body(admin_source, "safeHref")
+
+        assert "https?:" in body
+        assert "mailto:" in body
+        # Les caractères de contrôle sont retirés avant le test de protocole :
+        # "java\tscript:" est interprété comme "javascript:" par les navigateurs.
+        assert r"\x00-\x20" in body
+        assert "toLowerCase()" in body, "test de protocole sensible à la casse"
+        assert "return null" in body, "aucune URL n'est refusée"
+
+    def test_links_carry_noopener(self, admin_source):
+        body = _function_body(admin_source, "mdExport")
+        assert 'rel="noopener noreferrer"' in body

@@ -2009,11 +2009,37 @@ hr{border:none;border-top:1px solid #e5e7eb;margin:30px 0}
 }
 
 /* ===== Markdown → HTML for export (light theme, standard HTML) ===== */
+// Valide l'URL d'un lien Markdown avant de l'insérer dans un attribut href.
+//
+// Échapper les chevrons et les guillemets ne suffit pas : `javascript:` reste
+// un href parfaitement valide, et exécute du code au clic. Seuls des protocoles
+// explicitement autorisés — plus les liens relatifs et les ancres — passent.
+//
+// Retourne null quand l'URL est refusée ; l'appelant rend alors le libellé en
+// texte simple plutôt que d'émettre un lien inerte ou dangereux.
+function safeHref(raw){
+    // `raw` a déjà traversé esc() : on décode pour raisonner sur l'URL réelle.
+    const decoded=String(raw==null?'':raw)
+        .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+        .replace(/&quot;/g,'"').replace(/&#39;/g,"'")
+        .trim();
+    // Les caractères de contrôle sont retirés POUR LE TEST seulement :
+    // "java\tscript:" est interprété comme "javascript:" par les navigateurs.
+    const probe=decoded.replace(/[\x00-\x20]/g,'').toLowerCase();
+    if(/^(https?:|mailto:)/.test(probe)) return esc(decoded);
+    if(/^[/#]/.test(probe)) return esc(decoded);   // relatif ou ancre
+    return null;
+}
+
 function mdExport(text){
     if(!text)return '';
     let s=esc(text);
-    // Clean escaped quotes from JSON serialization
-    s=s.replace(/\\&quot;/g,'&quot;').replace(/\\"/g,'"');
+    // Nettoie les guillemets échappés issus de la sérialisation JSON.
+    //
+    // La seconde substitution historique — /\\"/g → '"' — est SUPPRIMÉE :
+    // elle réinjectait des guillemets bruts juste après esc(), annulant
+    // l'échappement et rouvrant l'injection d'attribut dans le fichier exporté.
+    s=s.replace(/\\&quot;/g,'&quot;');
     // Code blocks ```...```
     s=s.replace(/```(\w*)\n([\s\S]*?)```/g,'<pre><code>$2</code></pre>');
     // Inline code
@@ -2027,8 +2053,15 @@ function mdExport(text){
     s=s.replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>');
     s=s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
     s=s.replace(/\*(.+?)\*/g,'<em>$1</em>');
-    // Links [text](url)
-    s=s.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" style="color:#1a56db">$1</a>');
+    // Links [text](url) — URL validée, jamais interpolée telle quelle.
+    // rel="noopener noreferrer" : le fichier exporté est ouvert hors de toute
+    // origine de confiance, et une page cible ne doit ni accéder à window.opener
+    // ni recevoir le référent.
+    s=s.replace(/\[([^\]]+)\]\(([^)]+)\)/g,function(match,label,url){
+        const href=safeHref(url);
+        if(!href) return label;   // protocole refusé → libellé en texte simple
+        return '<a href="'+href+'" rel="noopener noreferrer" target="_blank" style="color:#1a56db">'+label+'</a>';
+    });
     // Horizontal rules
     s=s.replace(/^---+$/gm,'<hr>');
     // Tables
