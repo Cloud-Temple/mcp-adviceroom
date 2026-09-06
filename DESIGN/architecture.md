@@ -247,14 +247,14 @@ Quand un LLM émet une question pour l'utilisateur :
                     └──────┬───────┘
                            │ NDJSON streaming
                     ┌──────┴───────┐
-                    │   Backend    │  FastAPI + FastMCP (Python)
+                    │   Backend    │  FastAPI + MCP SDK v2 (Python)
                     │ /admin/api   │  Debate Orchestrator
                     └──────┬───────┘
               ┌────────────┼────────────┐
               │            │            │
     ┌─────────┴──┐  ┌──────┴─────┐  ┌──┴──────────┐
     │ MCP Server │  │ LLM Router │  │ Tool Router  │
-    │ (FastMCP)  │  │ (Providers)│  │ (MCP Tools)  │
+    │ (MCPServer)│  │ (Providers)│  │ (MCP Tools)  │
     └────────────┘  └──────┬─────┘  └──────┬───────┘
                            │               │
               ┌────────────┼───────┐       │
@@ -411,7 +411,7 @@ Tous les outils sont disponibles pour **tous** les LLMs participants.
 
 > **Décision architecturale** : le serveur MCP, l'API admin, l'API REST de compatibilité et le moteur de débat vivent dans le **même processus FastAPI**. Le backend sert `/admin` + `/admin/api/*` pour la console et la CLI, `/api/v1/*` pour compatibilité REST, et `/mcp` en Streamable HTTP pour les agents IA. Pas de service séparé, pas de communication inter-processus.
 >
-> **Justification** : le Debate Engine est le même code dans les deux cas. Séparer en deux services forcerait soit une duplication du moteur, soit une API REST interne (latence + complexité). Le pattern starter-kit montre déjà comment monter FastMCP dans une app ASGI existante via `create_app()`.
+> **Justification** : le Debate Engine est le même code dans les deux cas. Séparer en deux services forcerait soit une duplication du moteur, soit une API REST interne (latence + complexité). Le pattern starter-kit montre déjà comment monter un serveur MCP dans une app ASGI existante via `create_app()`.
 
 ```python
 # app/main.py — un seul processus, plusieurs surfaces HTTP
@@ -423,7 +423,7 @@ def create_app():
     fastapi_app.include_router(providers_router, prefix="/api/v1")
     fastapi_app.mount("/mcp", mcp_app)
 
-    # Pile ASGI réelle : Logging → Admin → Health → Auth → FastAPI+FastMCP
+    # Pile ASGI réelle : Logging → Admin → Health → Auth → FastAPI+MCPServer
     app = fastapi_app
     app = AuthMiddleware(app)
     app = HealthCheckMiddleware(app)
@@ -555,6 +555,22 @@ Le flux NDJSON est le protocole de communication temps réel entre le backend et
 
 ```yaml
 # config/llm_models.yaml
+#
+# Deux champs optionnels portent les contraintes propres à un modèle, afin
+# qu'aucune heuristique de préfixe de nom ne soit nécessaire dans le code :
+#
+#   supports_temperature: false   → le champ "temperature" est OMIS du payload.
+#                                   Certains modèles le rejettent (HTTP 400)
+#                                   plutôt que d'accepter n'importe quelle valeur.
+#   extra_params: {...}           → fusionné tel quel dans le payload provider.
+#                                   Ex. reasoning_effort, obligatoire sur
+#                                   gpt-5.6-terra dès que des function tools
+#                                   sont envoyés.
+#
+# Ces contraintes sont parfois COUPLÉES : sur gpt-5.6-terra, c'est
+# reasoning_effort="none" qui rend simultanément les function tools et le
+# paramètre temperature acceptables. Les modifier isolément casse les appels.
+
 categories:
   snc:
     display_name: "SecNumCloud"
@@ -648,7 +664,7 @@ L'interface est normalisée au format OpenAI (standard interne hérité de Quote
 | Composant     | Technologie              | Rôle                               |
 | ------------- | ------------------------ | ---------------------------------- |
 | Framework API | FastAPI (Python 3.12)    | API REST + NDJSON streaming        |
-| Framework MCP | FastMCP (Python SDK)     | Outils MCP via Streamable HTTP     |
+| Framework MCP | MCP Python SDK v2 (`MCPServer`) | Outils MCP via Streamable HTTP |
 | Serveur HTTP  | Uvicorn (ASGI)           | Sert l'application                 |
 | Configuration | pydantic-settings        | Variables d'environnement + `.env` |
 | LLM clients   | httpx (async)            | Appels aux APIs LLM                |
@@ -730,15 +746,40 @@ Tous les composants sont **dupliqués** depuis QuoteFlow dans le repo AdviceRoom
 - **Pas de token via query string** : Bearer header uniquement
 - **Comparaison constante** : `hmac.compare_digest()` pour les clés
 - **Fail-close** : token invalide/expiré → rejet
-- **WAF** : Caddy + Coraza OWASP CRS + rate limiting
+- **WAF** : Caddy + Coraza OWASP CRS
 - **HSTS** : forcé dans le WAF
-- **Les clés API des providers LLM** sont côté serveur uniquement (jamais exposées au frontend)
+- **Les clés API des providers LLM** sont côté serveur uniquement (jamais exposées au frontend), et typées `SecretStr` pour ne pas apparaître dans une représentation des settings
+- **Secrets jamais journalisés** : ni prompt, ni réponse de LLM, ni argument ou résultat d'outil. Les logs de diagnostic sont structurels — noms, clés d'arguments, tailles
 
 ### 8.2 Modèle d'authentification
 
 Deux surfaces coexistent :
 1. **Console `/admin` + CLI** : Bearer token via bootstrap key ou Token Store S3
 2. **MCP** : Bearer token via le même Token Store S3 (pattern starter-kit)
+
+La clé de bootstrap n'a **aucune valeur par défaut** : non configurée, le bootstrap est désactivé (fail-closed) et l'accès admin ne passe que par le Token Store. Toute comparaison passe par `Settings.bootstrap_key_matches()`, point unique qui refuse les valeurs vides — `hmac.compare_digest("", "")` étant vrai, une clé non configurée aurait sinon authentifié un porteur sans secret.
+
+Les écritures du Token Store sont **fail-closed** : une révocation qui n'a pas pu être persistée sur S3 remonte une erreur (HTTP 503) au lieu d'être confirmée. Sans cela, une révocation opérée pendant une panne S3 était annoncée à l'administrateur puis perdue, et le token redevenait actif au rechargement suivant.
+
+### 8.3 Rate limiting applicatif
+
+Le WAF ne protège pas du coût : une requête légitime et authentifiée peut mobiliser 5 LLMs plus un synthétiseur. Le contrôle est donc **applicatif**, appliqué aux **trois** voies de création de débats (REST, admin, MCP) — une seule voie non protégée annulerait les autres.
+
+| Garde | Contre quoi | Défaut | Réglage |
+| --- | --- | --- | --- |
+| Débit (fenêtre glissante par client) | les rafales | 10/min | `RATE_LIMIT_DEBATES_PER_MINUTE` |
+| Quota de débats simultanés | l'accumulation lente | 5/client | `RATE_LIMIT_MAX_ACTIVE_DEBATES` |
+| Création de tokens admin | un admin compromis | 10/min | `RATE_LIMIT_TOKENS_PER_MINUTE` |
+
+Les deux premières ne sont pas redondantes : un client respectant le débit saturerait quand même les appels LLM concurrents. Le refus renvoie `429`, précède tout travail — aucune dépense LLM n'est engagée — et porte `Retry-After` pour le débit. Le quota ne l'expose pas : l'attente y dépend de la fin d'un débat, pas du temps.
+
+L'état est en mémoire de processus, ce que le déploiement mono-backend rend suffisant. À revoir en multi-backend.
+
+### 8.4 Limite structurelle assumée — injection de prompt du verdict
+
+Les positions et arguments produits par les participants alimentent le prompt du synthétiseur. Un participant manipulé peut donc tenter d'infléchir le verdict. C'est une propriété **inhérente** à une architecture LLM-to-LLM : elle se traite en défense en profondeur — délimitation stricte des segments non fiables, hiérarchie d'instructions, contrôle de cohérence du verdict — et ne se referme pas.
+
+Conséquence de conception : **un débat n'est pas une frontière de confiance**. Aucune décision d'autorisation, aucun accès à une ressource et aucune donnée d'un autre locataire ne doit dépendre du contenu d'un débat.
 
 ---
 
