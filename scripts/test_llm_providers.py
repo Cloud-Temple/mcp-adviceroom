@@ -70,9 +70,23 @@ TESTS = [
         "provider_cls": "app.services.llm.openai.OpenAIProvider",
     },
     {
+        "id": "gpt56terra", "name": "OpenAI GPT-5.6 Terra",
+        "key_env": "OPENAI_API_KEY", "model": "gpt-5.6-terra",
+        "provider_cls": "app.services.llm.openai.OpenAIProvider",
+        # reasoning_effort="none" est obligatoire avec des function tools, et c'est
+        # lui qui rend "temperature" de nouveau acceptable — cf. llm_models.yaml.
+        "extra_params": {"reasoning_effort": "none"},
+    },
+    {
         "id": "anthropic", "name": "Anthropic Claude",
         "key_env": "ANTHROPIC_API_KEY", "model": "claude-opus-4-6",
         "provider_cls": "app.services.llm.anthropic.AnthropicProvider",
+    },
+    {
+        "id": "opus5", "name": "Anthropic Claude Opus 5",
+        "key_env": "ANTHROPIC_API_KEY", "model": "claude-opus-5",
+        "provider_cls": "app.services.llm.anthropic.AnthropicProvider",
+        "supports_temperature": False,
     },
 ]
 
@@ -116,7 +130,9 @@ async def test_one_provider(cfg):
     try:
         resp = await provider.chat_completion(
             messages=MESSAGES, model_override=cfg["model"],
-            temperature=0.5, max_tokens=200,
+            temperature=0.5 if cfg.get("supports_temperature", True) else None,
+            max_tokens=200,
+            extra_params=cfg.get("extra_params"),
         )
         ms = int((time.monotonic() - t0) * 1000)
 
@@ -238,7 +254,7 @@ def summary(results):
     if fail_n: parts.append(fail(f"{fail_n} FAIL"))
     print(f"  {bold('Resultat')} : {' / '.join(parts)}  ({total} tests)")
 
-    llm_ok = sum(1 for r in results[:4] if r.get("status") == "ok")  # 4 premiers = LLM
+    llm_ok = sum(1 for r in results[:len(TESTS)] if r.get("status") == "ok")  # les N premiers = LLM
     if llm_ok >= 2:
         print(f"  {ok('>> Pret pour un debat')} ({llm_ok} providers LLM fonctionnels)")
     elif llm_ok == 1:

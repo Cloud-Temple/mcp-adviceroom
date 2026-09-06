@@ -196,11 +196,15 @@ class ToolExecutor:
         # Nettoyer les None des arguments
         mcp_args = {k: v for k, v in mcp_args.items() if v is not None}
 
-        logger.info(f"🔧 Tool call : {tool_name} → {mcp_tool}({mcp_args})")
+        # Diagnostic structurel uniquement : ni les arguments ni le résultat ne
+        # sont journalisés. Ils dérivent de la question de débat et des réponses
+        # des LLMs — donc de données utilisateur (issue #2, critère #5).
+        # On garde les CLÉS des arguments, pas leurs valeurs.
+        logger.info(f"🔧 Tool call : {tool_name} → {mcp_tool}(args={sorted(mcp_args)})")
 
         try:
             result = await self._call_mcp_tool(mcp_tool, mcp_args)
-            logger.info(f"  ✓ Résultat : {str(result)[:200]}")
+            logger.info(f"  ✓ Résultat {tool_name} : {len(str(result))} chars")
             return {"status": "ok", "result": result}
         except Exception as e:
             logger.error(f"  ✗ Erreur tool {tool_name}: {e}")

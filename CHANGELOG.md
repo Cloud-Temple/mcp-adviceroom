@@ -5,6 +5,32 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Corrigé
+
+- **Providers LLM — Claude Opus 5 et GPT-5.6 Terra** ([#2](https://github.com/Cloud-Temple/mcp-adviceroom/issues/2)) : les deux modèles échouaient en HTTP 400 avant toute génération, le payload contenant systématiquement `temperature`. Les contraintes sont désormais portées par le registre des modèles (`ModelConfig.supports_temperature` et `ModelConfig.extra_params`, résolus par `LLMRouter`), et non par des heuristiques de préfixe de nom
+  - `claude-opus-5` : le champ `temperature` est omis, en génération standard, en streaming et dans le retry `thinking`. `claude-opus-4-6` conserve son comportement
+  - `gpt-5.6-terra` : `reasoning_effort: "none"` est obligatoire dès que des function tools sont présents — toute valeur de raisonnement active (`low`, `medium`, `high`, `xhigh`) déclenche un HTTP 400. Ce même réglage rend le paramètre `temperature` de nouveau acceptable : les températures modulées par phase (0.7 en débat, 0.8 en anti-conformité, 0.3 pour un verdict factuel) sont donc préservées
+  - Les 4 sites d'appel sont couverts (`orchestrator` ×3 et `verdict`), en standard comme en streaming
+- **Isolation des tests** : les deux `test_headers_format` supprimaient définitivement une clé API réelle de l'environnement (`del os.environ[...]`), faisant échouer les tests d'intégration réelle exécutés ensuite. Remplacé par `monkeypatch.setenv`
+
+### Sécurité
+
+- **Fuite de contenu utilisateur dans les logs** (`services/tools/executor.py`) : les arguments d'outil — dont la requête de recherche web dérivée de la question de débat — et un aperçu de 200 caractères du résultat étaient journalisés en niveau `INFO`, donc actifs en production. Remplacé par un diagnostic structurel : nom de l'outil, **clés** des arguments et taille du résultat, sans aucune valeur. Couvert par `tests/test_tools_executor.py`
+- **Debug Anthropic** : les `print` de diagnostic exposant rôles, tailles, aperçus de texte et, en cas de réponse vide, le contenu complet des réponses, sont remplacés par un `logger.debug` purement structurel
+
+### Remerciements
+
+- [@atilavahedian](https://github.com/atilavahedian) pour le diagnostic du rejet
+  `Function tools with reasoning_effort are not supported for gpt-5.6-terra`
+  ([PR #3](https://github.com/Cloud-Temple/mcp-adviceroom/pull/3)). Ce rejet masquait
+  l'erreur `temperature` décrite dans l'issue #2 et n'apparaissait donc pas dans nos
+  reproductions. Sans ce signalement, une valeur `reasoning_effort` inopérante partait
+  en production et cassait tous les appels au modèle OpenAI par défaut
+
+---
+
 ## [0.2.0] — 2026-05-26
 
 ### Corrigé

@@ -272,9 +272,10 @@ class AnthropicProvider(BaseLLMProvider):
         self,
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
-        temperature: float = 0.7,
+        temperature: Optional[float] = 0.7,
         max_tokens: Optional[int] = None,
         model_override: Optional[str] = None,
+        extra_params: Optional[Dict[str, Any]] = None,
     ) -> LLMResponse:
         """Chat completion non-streaming via Anthropic Claude."""
         model = model_override or self.default_model
@@ -286,8 +287,9 @@ class AnthropicProvider(BaseLLMProvider):
             "model": model,
             "messages": anthropic_msgs,
             "max_tokens": max_tokens or self._default_max_tokens,
-            "temperature": temperature,
         }
+        if temperature is not None:
+            payload["temperature"] = temperature
 
         if system_text:
             payload["system"] = system_text
@@ -295,23 +297,10 @@ class AnthropicProvider(BaseLLMProvider):
         if tools:
             payload["tools"] = self._openai_tools_to_anthropic(tools)
 
-        try:
-            # DEBUG OPUS: log payload envoyé (print pour éviter troncature Rich)
-            _dbg_roles = [m.get('role','?') for m in payload.get('messages',[])]
-            _dbg_msg_lens = [len(json.dumps(m.get('content',''))) for m in payload.get('messages',[])]
-            print(f"\n{'='*80}")
-            print(f"🔍 OPUS DEBUG SEND")
-            print(f"  model        = {payload.get('model')}")
-            print(f"  max_tokens   = {payload.get('max_tokens')}")
-            print(f"  temperature  = {payload.get('temperature')}")
-            print(f"  system_len   = {len(payload.get('system',''))} chars")
-            print(f"  messages     = {len(payload.get('messages',[]))} msgs")
-            print(f"  has_tools    = {'tools' in payload}")
-            print(f"  msg_roles    = {_dbg_roles}")
-            print(f"  msg_sizes    = {_dbg_msg_lens}")
-            print(f"  total_payload= {len(json.dumps(payload))} chars")
-            print(f"{'='*80}\n", flush=True)
+        if extra_params:
+            payload.update(extra_params)
 
+        try:
             async with httpx.AsyncClient(timeout=180.0) as client:
                 response = await client.post(
                     f"{self.base_url}/v1/messages",
@@ -321,51 +310,40 @@ class AnthropicProvider(BaseLLMProvider):
                 response.raise_for_status()
                 data = response.json()
 
-            # DEBUG OPUS: log réponse reçue (print pour éviter troncature Rich)
+            # Diagnostic structurel uniquement — aucun contenu (prompt/réponse) journalisé.
             content_blocks = data.get("content", [])
-            usage_data = data.get("usage", {})
-            _block_types = [b.get('type','?') for b in content_blocks]
-            _has_text = any(b.get('text','').strip() for b in content_blocks if b.get('type')=='text')
-            _text_preview = ""
-            for b in content_blocks:
-                if b.get('type') == 'text' and b.get('text','').strip():
-                    _text_preview = b['text'][:200]
-                    break
-            print(f"\n{'='*80}")
-            print(f"🔍 OPUS DEBUG RECV")
-            print(f"  id           = {data.get('id','?')}")
-            print(f"  model        = {data.get('model','?')}")
-            print(f"  stop_reason  = {data.get('stop_reason','?')}")
-            print(f"  blocks       = {len(content_blocks)} ({_block_types})")
-            print(f"  input_tok    = {usage_data.get('input_tokens',0)}")
-            print(f"  output_tok   = {usage_data.get('output_tokens',0)}")
-            print(f"  has_text     = {_has_text}")
-            print(f"  text_preview = {_text_preview[:200] if _text_preview else '(VIDE)'}")
-            if not _has_text:
-                print(f"  ⚠️ FULL CONTENT = {json.dumps(content_blocks, ensure_ascii=False)[:2000]}")
-            print(f"{'='*80}\n", flush=True)
-
-            has_text = _has_text
-            _has_tool_use = any(b.get('type') == 'tool_use' for b in content_blocks)
+            block_types = [b.get("type", "?") for b in content_blocks]
+            has_text = any(
+                b.get("text", "").strip() for b in content_blocks if b.get("type") == "text"
+            )
+            has_tool_use = any(b.get("type") == "tool_use" for b in content_blocks)
+            logger.debug(
+                f"Anthropic recv model={data.get('model', '?')} "
+                f"stop_reason={data.get('stop_reason', '?')} blocks={block_types} "
+                f"has_text={has_text} has_tool_use={has_tool_use}"
+            )
 
             # Ne retry que si la réponse est VRAIMENT vide (ni texte, ni tool_use)
             # Les tool_use blocks sont une réponse valide — le modèle veut utiliser ses outils !
-            if not has_text and not _has_tool_use:
+            if not has_text and not has_tool_use:
                 logger.warning(f"⚠ Anthropic content vide (pas de texte ni tool_use) — retry avec thinking")
                 # Retry avec extended thinking activé (force Opus à produire du contenu)
                 logger.info(f"🔄 Retry Anthropic avec thinking activé pour {model}")
-                thinking_payload = {
+                thinking_payload: Dict[str, Any] = {
                     "model": model,
                     "messages": anthropic_msgs,
                     "max_tokens": max_tokens or self._default_max_tokens,
-                    "temperature": 1.0,  # Requis quand thinking est activé
                     "thinking": {
                         "type": "enabled",
                         "budget_tokens": 8000,
                     },
                 }
+                if temperature is not None:
+                    thinking_payload["temperature"] = 1.0  # Requis quand thinking est activé (si le modèle supporte encore ce paramètre)
                 if system_text:
                     thinking_payload["system"] = system_text
+                if extra_params:
+                    thinking_payload.update(extra_params)
 
                 async with httpx.AsyncClient(timeout=180.0) as client2:
                     response2 = await client2.post(
@@ -412,9 +390,10 @@ class AnthropicProvider(BaseLLMProvider):
         self,
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
-        temperature: float = 0.7,
+        temperature: Optional[float] = 0.7,
         max_tokens: Optional[int] = None,
         model_override: Optional[str] = None,
+        extra_params: Optional[Dict[str, Any]] = None,
     ) -> AsyncGenerator[LLMStreamChunk, None]:
         """
         Chat completion streaming via Anthropic Claude.
@@ -431,15 +410,19 @@ class AnthropicProvider(BaseLLMProvider):
             "model": model,
             "messages": anthropic_msgs,
             "max_tokens": max_tokens or self._default_max_tokens,
-            "temperature": temperature,
             "stream": True,
         }
+        if temperature is not None:
+            payload["temperature"] = temperature
 
         if system_text:
             payload["system"] = system_text
 
         if tools:
             payload["tools"] = self._openai_tools_to_anthropic(tools)
+
+        if extra_params:
+            payload.update(extra_params)
 
         try:
             async with httpx.AsyncClient(timeout=180.0) as client:

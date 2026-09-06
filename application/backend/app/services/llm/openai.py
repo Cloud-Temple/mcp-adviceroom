@@ -57,9 +57,10 @@ class OpenAIProvider(BaseLLMProvider):
         self,
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
-        temperature: float = 0.7,
+        temperature: Optional[float] = 0.7,
         max_tokens: Optional[int] = None,
         model_override: Optional[str] = None,
+        extra_params: Optional[Dict[str, Any]] = None,
     ) -> LLMResponse:
         """
         Chat completion non-streaming via OpenAI.
@@ -71,15 +72,18 @@ class OpenAIProvider(BaseLLMProvider):
         payload: Dict[str, Any] = {
             "model": model,
             "messages": messages,
-            "temperature": temperature,
             "stream": False,
         }
+        if temperature is not None:
+            payload["temperature"] = temperature
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
         if max_tokens:
             # GPT-5+ utilise max_completion_tokens au lieu de max_tokens
             payload["max_completion_tokens"] = max_tokens
+        if extra_params:
+            payload.update(extra_params)
 
         try:
             async with httpx.AsyncClient(timeout=180.0) as client:
@@ -128,9 +132,10 @@ class OpenAIProvider(BaseLLMProvider):
         self,
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
-        temperature: float = 0.7,
+        temperature: Optional[float] = 0.7,
         max_tokens: Optional[int] = None,
         model_override: Optional[str] = None,
+        extra_params: Optional[Dict[str, Any]] = None,
     ) -> AsyncGenerator[LLMStreamChunk, None]:
         """
         Chat completion streaming via OpenAI.
@@ -143,15 +148,18 @@ class OpenAIProvider(BaseLLMProvider):
         payload: Dict[str, Any] = {
             "model": model,
             "messages": messages,
-            "temperature": temperature,
             "stream": True,
         }
+        if temperature is not None:
+            payload["temperature"] = temperature
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
         if max_tokens:
             # GPT-5+ utilise max_completion_tokens au lieu de max_tokens
             payload["max_completion_tokens"] = max_tokens
+        if extra_params:
+            payload.update(extra_params)
 
         try:
             async with httpx.AsyncClient(timeout=180.0) as client:

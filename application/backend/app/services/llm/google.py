@@ -300,9 +300,10 @@ class GoogleProvider(BaseLLMProvider):
         self,
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
-        temperature: float = 0.7,
+        temperature: Optional[float] = 0.7,
         max_tokens: Optional[int] = None,
         model_override: Optional[str] = None,
+        extra_params: Optional[Dict[str, Any]] = None,
     ) -> LLMResponse:
         """Chat completion non-streaming via Google Gemini."""
         model = model_override or self.default_model
@@ -311,24 +312,28 @@ class GoogleProvider(BaseLLMProvider):
         system_text, contents = self._openai_messages_to_google(messages)
 
         # Construire le payload Google
-        payload: Dict[str, Any] = {
-            "contents": contents,
-            "generationConfig": {
-                "temperature": temperature,
-            },
-        }
+        payload: Dict[str, Any] = {"contents": contents}
+        generation_config: Dict[str, Any] = {}
+        if temperature is not None:
+            generation_config["temperature"] = temperature
 
         if system_text:
             payload["system_instruction"] = {"parts": [{"text": system_text}]}
 
         if max_tokens:
-            payload["generationConfig"]["maxOutputTokens"] = max_tokens
+            generation_config["maxOutputTokens"] = max_tokens
+
+        if generation_config:
+            payload["generationConfig"] = generation_config
 
         if tools:
             payload["tools"] = self._openai_tools_to_google(tools)
             payload["toolConfig"] = {
                 "functionCallingConfig": {"mode": "AUTO"}
             }
+
+        if extra_params:
+            payload.update(extra_params)
 
         try:
             async with httpx.AsyncClient(timeout=180.0) as client:
@@ -367,9 +372,10 @@ class GoogleProvider(BaseLLMProvider):
         self,
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
-        temperature: float = 0.7,
+        temperature: Optional[float] = 0.7,
         max_tokens: Optional[int] = None,
         model_override: Optional[str] = None,
+        extra_params: Optional[Dict[str, Any]] = None,
     ) -> AsyncGenerator[LLMStreamChunk, None]:
         """
         Chat completion streaming via Google Gemini.
@@ -381,24 +387,28 @@ class GoogleProvider(BaseLLMProvider):
 
         system_text, contents = self._openai_messages_to_google(messages)
 
-        payload: Dict[str, Any] = {
-            "contents": contents,
-            "generationConfig": {
-                "temperature": temperature,
-            },
-        }
+        payload: Dict[str, Any] = {"contents": contents}
+        generation_config: Dict[str, Any] = {}
+        if temperature is not None:
+            generation_config["temperature"] = temperature
 
         if system_text:
             payload["system_instruction"] = {"parts": [{"text": system_text}]}
 
         if max_tokens:
-            payload["generationConfig"]["maxOutputTokens"] = max_tokens
+            generation_config["maxOutputTokens"] = max_tokens
+
+        if generation_config:
+            payload["generationConfig"] = generation_config
 
         if tools:
             payload["tools"] = self._openai_tools_to_google(tools)
             payload["toolConfig"] = {
                 "functionCallingConfig": {"mode": "AUTO"}
             }
+
+        if extra_params:
+            payload.update(extra_params)
 
         # Compteur pour émuler le format indexé OpenAI des tool_calls
         tool_call_index = 0

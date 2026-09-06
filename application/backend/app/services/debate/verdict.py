@@ -157,8 +157,9 @@ class VerdictSynthesizer:
             response: LLMResponse = await provider.chat_completion(
                 messages=messages,
                 tools=tools,  # Tous les modèles doivent pouvoir utiliser leurs tools
-                temperature=0.3,  # Bas pour un verdict factuel
+                temperature=model_config.resolve_temperature(0.3),  # Bas pour un verdict factuel
                 model_override=model_config.api_model_id,
+                extra_params=model_config.extra_params,
             )
 
             if response.finish_reason == "error":

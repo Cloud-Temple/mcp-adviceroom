@@ -674,8 +674,9 @@ class DebateOrchestrator:
                 provider.chat_completion(
                     messages=messages,
                     tools=tools,  # Toujours passer les tools — Anthropic l'exige quand les messages contiennent des tool_use/tool_result blocks
-                    temperature=0.7,
+                    temperature=model_cfg.resolve_temperature(0.7),
                     model_override=model_cfg.api_model_id,
+                    extra_params=model_cfg.extra_params,
                 ),
                 timeout=self._provider_timeout,
             )
@@ -741,8 +742,9 @@ class DebateOrchestrator:
                         provider.chat_completion(
                             messages=messages,
                             tools=tools,  # Anthropic exige les tools quand les messages contiennent des tool_use/tool_result blocks
-                            temperature=0.7,
+                            temperature=model_cfg.resolve_temperature(0.7),
                             model_override=model_cfg.api_model_id,
+                            extra_params=model_cfg.extra_params,
                         ),
                         timeout=self._provider_timeout,
                     )
@@ -875,8 +877,9 @@ class DebateOrchestrator:
                 response = await provider.chat_completion(
                     messages=retry_messages,
                     tools=ac_tools,
-                    temperature=0.8,
+                    temperature=model_cfg.resolve_temperature(0.8),
                     model_override=model_cfg.api_model_id,
+                    extra_params=model_cfg.extra_params,
                 )
                 challenge = parse_challenge(response.content or "")
                 if challenge:
