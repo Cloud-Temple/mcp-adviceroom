@@ -148,15 +148,38 @@ docker compose exec backend curl -sf http://localhost:8000/health
 
 ### Développement local
 
-```bash
-cd application/backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+**Utilisez un environnement virtuel dédié à ce projet**, créé à la racine du dépôt.
+Un venv partagé entre plusieurs projets finit par les casser : quand deux projets
+exigent des versions incompatibles d'une même dépendance, `pip` installe la
+dernière demandée et l'autre cesse de fonctionner, sans avertissement. AdviceRoom
+requiert `mcp>=2.1.1,<3` — une contrainte que d'autres outils ne partagent pas
+forcément.
 
-# Tests
+```bash
+# Depuis la racine du dépôt — venv en Python 3.13 (la production est en 3.12)
+python3.13 -m venv .venv
+source .venv/bin/activate
+pip install -r application/backend/requirements.txt
+```
+
+```bash
+# Serveur de développement
+cd application/backend
+uvicorn app.main:app --reload --port 8000
+```
+
+```bash
+# Tests (depuis application/backend, venv activé)
 pytest tests/ -v
 ```
+
+Les tests d'intégration réelle sont ignorés par défaut et ne s'exécutent que si
+les clés d'API correspondantes sont présentes dans l'environnement — aucun appel
+réseau ni coût accidentel lors d'un `pytest` ordinaire.
+
+> Vérifiez que vous utilisez bien le bon interpréteur : `which python` doit
+> pointer vers `.venv/bin/python` du dépôt. Si votre shell active un venv global
+> au démarrage, il faut activer celui du projet **après**.
 
 ## Interface Web
 
