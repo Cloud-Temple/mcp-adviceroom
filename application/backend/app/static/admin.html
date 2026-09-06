@@ -927,7 +927,10 @@ function md(text){
 }
 
 /* ===== Helpers ===== */
-function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+// Échappe aussi les guillemets : sans eux, une valeur interpolée dans un
+// ATTRIBUT (href, title, style...) peut s'en échapper et injecter un
+// gestionnaire d'événement, alors même que < et > sont neutralisés.
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 // Escape but allow <br> tags to render as line breaks
 function escBr(s){return esc(s).replace(/&lt;br&gt;/gi,'<br>').replace(/&lt;br\/&gt;/gi,'<br>').replace(/&lt;br \/&gt;/gi,'<br>')}
 function providerClass(p){return 'provider-'+(p||'unknown').toLowerCase()}
@@ -2251,16 +2254,61 @@ async function loadLlmActivity(){
     }
 }
 
+// XSS STOCKÉ — construction par DOM, jamais par innerHTML.
+//
+// `l.path` et `l.method` proviennent de la requête HTTP brute, journalisée par
+// LoggingMiddleware AVANT toute authentification. N'importe qui pouvait donc
+// déposer un payload par un simple `curl https://host/<charge-utile>`, qui
+// s'exécutait ensuite dans le navigateur de tout admin ouvrant l'onglet
+// Activité — avec vol du token Bearer conservé en localStorage à la clé.
+//
+// textContent traite ces valeurs comme du texte, jamais comme du balisage :
+// la faille est fermée par construction et ne dépend pas de la qualité d'une
+// fonction d'échappement.
 async function loadWebLogs(){
     const d=await api('/logs');
     const c=document.getElementById('logs-list');
-    if(!d.logs||!d.logs.length){c.innerHTML='<span style="color:var(--muted)">Aucune activité</span>';return}
-    c.innerHTML='';
-    d.logs.reverse().forEach(l=>{
-        const ts=new Date(l.timestamp*1000).toLocaleTimeString();
-        const sc=l.status>=400?'err':'ok';
-        c.innerHTML+=`<div class="log-entry"><span style="color:var(--muted)">${ts}</span> <span class="method">${l.method}</span> ${l.path} → <span class="${sc}">${l.status}</span> <span style="color:var(--muted)">(${l.duration_ms}ms)</span></div>`;
+    c.textContent='';
+    if(!d.logs||!d.logs.length){
+        const empty=document.createElement('span');
+        empty.style.color='var(--muted)';
+        empty.textContent='Aucune activité';
+        c.appendChild(empty);
+        return;
+    }
+    const frag=document.createDocumentFragment();
+    d.logs.slice().reverse().forEach(l=>{
+        const row=document.createElement('div');
+        row.className='log-entry';
+
+        const ts=document.createElement('span');
+        ts.style.color='var(--muted)';
+        ts.textContent=new Date(l.timestamp*1000).toLocaleTimeString();
+
+        const method=document.createElement('span');
+        method.className='method';
+        method.textContent=l.method==null?'':String(l.method);
+
+        // Le path est la donnée la plus hostile : texte pur, et borné pour
+        // qu'une URL très longue ne disloque pas la mise en page.
+        const path=document.createElement('span');
+        const rawPath=l.path==null?'':String(l.path);
+        path.textContent=rawPath.length>512?rawPath.slice(0,512)+'…':rawPath;
+        path.title=path.textContent;
+
+        const status=document.createElement('span');
+        status.className=l.status>=400?'err':'ok';
+        status.textContent=l.status==null?'':String(l.status);
+
+        const dur=document.createElement('span');
+        dur.style.color='var(--muted)';
+        dur.textContent='('+(l.duration_ms==null?'?':String(l.duration_ms))+'ms)';
+
+        row.append(ts,document.createTextNode(' '),method,document.createTextNode(' '),
+                   path,document.createTextNode(' → '),status,document.createTextNode(' '),dur);
+        frag.appendChild(row);
     });
+    c.appendChild(frag);
 }
 
 /* ===== Auto-refresh & Auto-login ===== */

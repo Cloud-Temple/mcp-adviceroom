@@ -54,14 +54,22 @@ class GoogleProvider(BaseLLMProvider):
         self.default_model = os.getenv("GEMINI_MODEL", "gemini-3.1-pro-preview")
 
     def _url(self, model: str, method: str) -> str:
-        """Construit l'URL API Google Gemini."""
-        return (
-            f"{_GOOGLE_API_BASE}/models/{model}:{method}"
-            f"?key={self.api_key}"
-        )
+        """
+        Construit l'URL API Google Gemini — SANS la clé d'API.
+
+        La clé transitait auparavant en query string (`?key=...`). Une URL
+        complète est journalisée par les logs d'accès du WAF Caddy, des proxys
+        et des intermédiaires réseau : le secret s'y retrouvait en clair, et
+        durablement. Elle passe désormais par l'en-tête x-goog-api-key.
+        """
+        return f"{_GOOGLE_API_BASE}/models/{model}:{method}"
 
     def _headers(self) -> Dict[str, str]:
-        return {"Content-Type": "application/json"}
+        """En-têtes Google, porteurs de la clé d'API."""
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["x-goog-api-key"] = self.api_key
+        return headers
 
     # ============================================================
     # Traduction OpenAI → Google
@@ -415,7 +423,9 @@ class GoogleProvider(BaseLLMProvider):
 
         try:
             async with httpx.AsyncClient(timeout=180.0) as client:
-                url = self._url(model, "streamGenerateContent") + "&alt=sse"
+                # "?" et non "&" : _url() ne porte plus de query string depuis que la
+                # clé est passée en en-tête.
+                url = self._url(model, "streamGenerateContent") + "?alt=sse"
 
                 # Debug : log du payload pour diagnostiquer les 400
                 logger.debug(
@@ -549,7 +559,8 @@ class GoogleProvider(BaseLLMProvider):
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(
-                    f"{_GOOGLE_API_BASE}/models?key={self.api_key}",
+                    f"{_GOOGLE_API_BASE}/models",
+                    headers=self._headers(),
                 )
                 response.raise_for_status()
                 data = response.json()

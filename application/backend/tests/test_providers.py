@@ -19,6 +19,8 @@ import logging
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from pathlib import Path
+
 import httpx
 import pytest
 
@@ -761,13 +763,20 @@ _LIVE_TOOLS = [{
     },
 }]
 
+# La consigne de RECOPIE est délibérée : sans elle, le modèle reformule
+# librement l'heure ("neuf heures quinze", "9h15 du matin"...) et l'assertion
+# devient instable. On veut mesurer le round-trip d'outils, pas la rédaction.
 _LIVE_TOOL_QUESTION = (
-    "Quelle heure est-il exactement ? Tu DOIS utiliser l'outil datetime_info "
-    "pour le savoir, ne devine pas."
+    "Quelle heure est-il ? Tu DOIS utiliser l'outil datetime_info, ne devine pas. "
+    "Puis recopie TEL QUEL, entre backticks, le contenu exact du champ "
+    "`datetime` que l'outil a renvoyé, sans le reformater."
 )
 
 # Horloge figée : on mesure le protocole d'outils, pas l'outil lui-même.
-_LIVE_TOOL_RESULT = '{"datetime": "2026-09-06T09:15:00+02:00", "tz": "Europe/Paris"}'
+# Le marqueur de secondes (:07) est improbable dans une réponse inventée, ce qui
+# distingue une vraie exploitation du résultat d'une hallucination plausible.
+_LIVE_TOOL_DATETIME = "2026-09-06T09:15:07+02:00"
+_LIVE_TOOL_RESULT = f'{{"datetime": "{_LIVE_TOOL_DATETIME}", "tz": "Europe/Paris"}}'
 
 
 async def _assert_live_tool_round_trip(provider, model, *, temperature, extra_params):
@@ -820,11 +829,15 @@ async def _assert_live_tool_round_trip(provider, model, *, temperature, extra_pa
     assert final.finish_reason != "error", f"{model} étape 4 : {final.content}"
 
     text = (final.content or "")
-    # Le modèle doit avoir exploité l'heure injectée. On accepte les variantes
-    # de formatage (09:15, 9h15, 09h15...) mais pas l'absence de la valeur.
+    # Le modèle doit avoir exploité la valeur injectée. On cherche plusieurs
+    # marqueurs plutôt qu'une chaîne unique : la valeur brute recopiée, ou à
+    # défaut les secondes ":07", improbables dans une réponse inventée.
+    # Un test qui exigerait une formulation précise serait instable — et un
+    # test instable finit par être ignoré.
     normalized = text.replace("h", ":").replace(" ", "")
-    assert "9:15" in normalized, (
-        f"{model} n'a pas exploité le résultat d'outil. Réponse : {text[:200]}"
+    markers = (_LIVE_TOOL_DATETIME, "09:15:07", "9:15:07", ":07")
+    assert any(m in text or m in normalized for m in markers), (
+        f"{model} n'a pas exploité le résultat d'outil. Réponse : {text[:300]}"
     )
 
 
@@ -906,3 +919,82 @@ class TestLiveIntegration:
             OpenAIProvider(), "gpt-5.6-terra",
             temperature=0.7, extra_params={"reasoning_effort": "none"},
         )
+
+
+# ============================================================
+# CRITICAL #4 (audit du 24/08/2026) — clé Gemini hors de l'URL
+# ============================================================
+#
+# GEMINI_API_KEY transitait en query string (`?key=...`) sur les appels de
+# génération ET sur le test de connectivité. Une URL complète est journalisée
+# par les logs d'accès du WAF Caddy, des proxys et des intermédiaires réseau :
+# le secret s'y retrouvait en clair et durablement.
+
+class TestGoogleApiKeyNeverInUrl:
+
+    @pytest.mark.asyncio
+    async def test_generate_sends_key_in_header_not_url(self, monkeypatch):
+        monkeypatch.setenv("GEMINI_API_KEY", "SECRET-GEMINI-KEY-c3f9a1")
+        provider = GoogleProvider()
+
+        response_json = {
+            "candidates": [{"content": {"parts": [{"text": "ok"}]}, "finishReason": "STOP"}],
+            "usageMetadata": {"promptTokenCount": 1, "candidatesTokenCount": 1, "totalTokenCount": 2},
+        }
+        client_cls, post_mock = _mock_async_client_post(response_json)
+        with patch("app.services.llm.google.httpx.AsyncClient", client_cls):
+            await provider.chat_completion(
+                messages=[{"role": "user", "content": "salut"}],
+                model_override="gemini-3.1-pro-preview",
+            )
+
+        url = post_mock.call_args.args[0] if post_mock.call_args.args else \
+            post_mock.call_args.kwargs["url"]
+        headers = post_mock.call_args.kwargs["headers"]
+
+        assert "SECRET-GEMINI-KEY-c3f9a1" not in url, "la clé fuite dans l'URL"
+        assert "key=" not in url
+        assert headers["x-goog-api-key"] == "SECRET-GEMINI-KEY-c3f9a1"
+
+    def test_url_builder_carries_no_secret(self, monkeypatch):
+        monkeypatch.setenv("GEMINI_API_KEY", "SECRET-GEMINI-KEY-c3f9a1")
+        provider = GoogleProvider()
+
+        url = provider._url("gemini-3.1-pro-preview", "generateContent")
+
+        assert "SECRET-GEMINI-KEY-c3f9a1" not in url
+        assert "?" not in url, (
+            "_url() ne doit porter aucune query string : le streaming y "
+            "concatène son propre paramètre."
+        )
+
+    def test_streaming_url_uses_question_mark_separator(self):
+        """
+        Régression subtile de la correction : le streaming concaténait
+        `&alt=sse` en s'appuyant sur le `?key=` qui précédait. Sans query
+        string, ce `&` produirait une URL invalide — il faut un `?`.
+        """
+        source = Path(
+            __file__
+        ).resolve().parent.parent / "app" / "services" / "llm" / "google.py"
+        text = source.read_text()
+
+        assert '+ "?alt=sse"' in text
+        assert '+ "&alt=sse"' not in text
+
+    def test_headers_omit_key_when_unset(self, monkeypatch):
+        """Sans clé configurée, aucun en-tête vide ne doit être envoyé."""
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        provider = GoogleProvider()
+
+        assert "x-goog-api-key" not in provider._headers()
+
+    def test_connectivity_probe_keeps_key_out_of_url(self):
+        """Le test de connectivité était le second site de fuite."""
+        source = Path(
+            __file__
+        ).resolve().parent.parent / "app" / "services" / "llm" / "google.py"
+        text = source.read_text()
+
+        assert "models?key=" not in text
+        assert 'f"{_GOOGLE_API_BASE}/models"' in text

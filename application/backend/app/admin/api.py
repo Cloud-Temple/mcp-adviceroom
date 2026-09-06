@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 from ..config.settings import get_settings
-from ..auth.token_store import get_token_store
+from ..auth.token_store import TokenStorePersistenceError, get_token_store
 from ..auth.middleware import get_activity_log
 
 
@@ -197,7 +197,7 @@ async def _api_whoami(send, token):
     settings = get_settings()
     auth_type = (
         "bootstrap"
-        if hmac.compare_digest(token, settings.admin_bootstrap_key)
+        if settings.bootstrap_key_matches(token)
         else "token"
     )
     result = {"status": "ok", "auth_type": auth_type}
@@ -271,10 +271,18 @@ async def _api_create_token(send, body):
     except (ValueError, TypeError):
         expires_in_days = 90
 
-    result = store.create(
-        client_name, permissions, allowed_resources,
-        expires_in_days=expires_in_days, email=email,
-    )
+    # 503 et non 500 : l'écriture S3 a échoué, l'opération est à retenter.
+    # Un 201 ici laisserait croire à un token créé qui n'existe nulle part.
+    try:
+        result = store.create(
+            client_name, permissions, allowed_resources,
+            expires_in_days=expires_in_days, email=email,
+        )
+    except TokenStorePersistenceError:
+        return await _json_response(
+            send, 503,
+            {"status": "error", "message": "Stockage des tokens indisponible — token NON créé"},
+        )
     await _json_response(send, 201, {"status": "created", **result})
 
 
@@ -293,7 +301,17 @@ async def _api_revoke_token(send, hash_prefix):
             "message": "Hash prefix trop court (min 8 caractères)",
         })
 
-    if store.revoke(hash_prefix):
+    # Une révocation non persistée doit être signalée comme un ÉCHEC : sinon
+    # l'admin croit le token neutralisé alors qu'il redeviendra actif.
+    try:
+        revoked = store.revoke(hash_prefix)
+    except TokenStorePersistenceError:
+        return await _json_response(
+            send, 503,
+            {"status": "error", "message": "Stockage des tokens indisponible — token NON révoqué"},
+        )
+
+    if revoked:
         await _json_response(
             send, 200,
             {"status": "ok", "message": f"Token {hash_prefix}… révoqué"},
@@ -947,7 +965,7 @@ def _is_authenticated(token: str) -> bool:
         return False
     settings = get_settings()
     # Bootstrap key = toujours authentifié
-    if hmac.compare_digest(token, settings.admin_bootstrap_key):
+    if settings.bootstrap_key_matches(token):
         return True
     # Token S3 : valide si existe et non-révoqué
     store = get_token_store()
@@ -965,7 +983,7 @@ def _is_admin(token: str) -> bool:
         return False
     settings = get_settings()
     # Comparaison constante contre timing attacks
-    if hmac.compare_digest(token, settings.admin_bootstrap_key):
+    if settings.bootstrap_key_matches(token):
         return True
     store = get_token_store()
     if store:
@@ -981,7 +999,7 @@ def _has_permission(token: str, permission: str) -> bool:
     if not token:
         return False
     settings = get_settings()
-    if hmac.compare_digest(token, settings.admin_bootstrap_key):
+    if settings.bootstrap_key_matches(token):
         return True
     store = get_token_store()
     if store:
@@ -998,7 +1016,7 @@ def _get_token_client_name(token: str) -> str:
     if not token:
         return "anonymous"
     settings = get_settings()
-    if hmac.compare_digest(token, settings.admin_bootstrap_key):
+    if settings.bootstrap_key_matches(token):
         return "admin"
     store = get_token_store()
     if store:
