@@ -148,15 +148,37 @@ docker compose exec backend curl -sf http://localhost:8000/health
 
 ### Local Development
 
-```bash
-cd application/backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+**Use a virtual environment dedicated to this project**, created at the repository
+root. A venv shared across projects eventually breaks them: when two projects
+require incompatible versions of the same dependency, `pip` installs whichever was
+requested last and the other silently stops working. AdviceRoom requires
+`mcp>=2.1.1,<3`, a constraint other tools may not share.
 
-# Tests
+```bash
+# From the repository root — venv on Python 3.13 (production runs 3.12)
+python3.13 -m venv .venv
+source .venv/bin/activate
+pip install -r application/backend/requirements.txt
+```
+
+```bash
+# Development server
+cd application/backend
+uvicorn app.main:app --reload --port 8000
+```
+
+```bash
+# Tests (from application/backend, with the venv active)
 pytest tests/ -v
 ```
+
+Live integration tests are skipped by default and only run when the matching API
+keys are present in the environment — a plain `pytest` triggers no network calls
+and no accidental cost.
+
+> Check you are on the right interpreter: `which python` should point at the
+> repository's `.venv/bin/python`. If your shell activates a global venv at
+> startup, activate the project's one **afterwards**.
 
 ## Web Interface
 
