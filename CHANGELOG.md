@@ -5,6 +5,18 @@ Toutes les modifications notables de ce projet sont documentées dans ce fichier
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/),
 versionning [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Sécurité
+
+- **Injection de prompt du verdict** (`services/debate/context_builder.py`, `config/prompts.yaml`, `services/debate/verdict.py`) — dernier finding **HIGH** de l'audit du 24/08/2026. La trajectoire du débat, produite par les LLMs participants, était interpolée dans le prompt **system** du synthétiseur : du contenu non fiable se retrouvait au même niveau d'autorité que les instructions de l'opérateur. Trois couches de défense en profondeur :
+  - **Séparation instructions / données** : le `system` ne contient plus aucune donnée du débat — uniquement la mission, une hiérarchie d'instructions explicite et le format de sortie. La trajectoire passe dans un message `user` distinct
+  - **Délimitation imprévisible** : le contenu non fiable est encadré par un marqueur dont la valeur est **régénérée à chaque appel**. Un délimiteur fixe serait lisible dans le dépôt, donc reproductible par un participant cherchant à simuler la fin du bloc. Si le marqueur apparaît malgré tout dans le contenu, il est neutralisé
+  - **Contrôle de cohérence a posteriori** : un verdict citant des participants absents du débat est journalisé comme anomalie. **Signal de supervision, jamais un blocage** — les LLMs orthographient les identifiants de façon approximative, et rejeter sur ce critère produirait surtout des faux positifs. La comparaison est donc tolérante à la casse et à la ponctuation
+  - **Ce correctif ne referme pas le risque**, et n'est pas présenté comme tel : l'injection de prompt entre participants est une propriété inhérente d'une architecture LLM-to-LLM. Elle est documentée comme limite structurelle assumée dans `SECURITY.md` et `DESIGN/architecture.md` §8.4, avec sa conséquence de conception — **un débat n'est pas une frontière de confiance**
+
+---
+
 ## [0.3.0] — 2026-09-06
 
 ### Modifié

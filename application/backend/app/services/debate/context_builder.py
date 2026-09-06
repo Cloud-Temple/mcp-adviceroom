@@ -10,6 +10,7 @@ Responsabilités :
 
 Ref: DESIGN/architecture.md §3.2-§3.4, §12, §16
 """
+import uuid
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -195,19 +196,62 @@ class ContextBuilder:
         # Formater les réponses utilisateur
         user_answers_text = self._format_user_answers(debate.user_answers)
 
-        # Formater le system prompt du verdict
-        system_template = self._prompts.get("verdict", {}).get("system", "")
-        system_prompt = system_template.format(
-            question=question,
-            user_answers=user_answers_text or "Aucune",
-            formatted_opening_positions=formatted_opening,
-            formatted_rounds=formatted_rounds,
+        # HIGH #1 — la trajectoire ne va PLUS dans le prompt system.
+        #
+        # Elle est produite par les LLMs participants : c'est du contenu non
+        # fiable. L'interpoler dans le system lui donnait le même niveau
+        # d'autorité que nos propres instructions — un participant manipulé
+        # pouvait donc s'adresser au synthétiseur comme s'il était l'opérateur.
+        #
+        # Le system ne porte plus que la mission et le format ; la trajectoire
+        # passe dans un message `user`, encadrée par un délimiteur à valeur
+        # ALÉATOIRE régénérée à chaque appel : un participant ne peut pas
+        # deviner ce qu'il faudrait écrire pour refermer le bloc et reprendre
+        # la parole en dehors.
+        system_prompt = self._prompts.get("verdict", {}).get("system", "")
+
+        fence = self._new_fence()
+        trajectory_template = self._prompts.get("verdict", {}).get("trajectory", "")
+        trajectory = trajectory_template.format(
+            fence=fence,
+            question=self._neutralize(question, fence),
+            user_answers=self._neutralize(user_answers_text, fence) or "Aucune",
+            formatted_opening_positions=self._neutralize(formatted_opening, fence),
+            formatted_rounds=self._neutralize(formatted_rounds, fence),
         )
 
         return [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": "Analyse cette trajectoire et produis ton verdict."},
+            {"role": "user", "content": trajectory},
         ]
+
+    # ------------------------------------------------------------------
+    # Délimitation du contenu non fiable
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _new_fence() -> str:
+        """
+        Délimiteur unique et imprévisible pour un appel donné.
+
+        Une valeur fixe (« ---DEBUT--- ») serait lisible dans le dépôt, donc
+        reproductible par un participant qui l'écrirait pour simuler la fin du
+        bloc de données. La régénérer à chaque appel retire cette possibilité.
+        """
+        return f"#DATA-{uuid.uuid4().hex[:16]}"
+
+    @staticmethod
+    def _neutralize(content: Optional[str], fence: str) -> str:
+        """
+        Rend un segment non fiable inoffensif vis-à-vis de son délimiteur.
+
+        Défense de dernier recours : même imprévisible, le délimiteur pourrait
+        se retrouver dans le contenu (fuite, répétition d'un tour précédent).
+        On le neutralise plutôt que de laisser une éventuelle sortie du bloc.
+        """
+        if not content:
+            return ""
+        return str(content).replace(fence, "[délimiteur retiré]")
 
     # ============================================================
     # Challenge retry
