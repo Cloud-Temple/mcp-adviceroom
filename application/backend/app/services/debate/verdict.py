@@ -105,6 +105,9 @@ class VerdictSynthesizer:
                 messages, self._fallback_model_id, debate
             )
 
+        # HIGH #1 — contrôle de cohérence post-verdict.
+        self._sanity_check(verdict, debate)
+
         # Durée totale
         elapsed_ms = int((time.monotonic() - start_time) * 1000)
         verdict.duration_ms = elapsed_ms
@@ -228,6 +231,64 @@ class VerdictSynthesizer:
         )
 
         return verdict
+
+    # ─── Contrôle de cohérence (HIGH #1) ─────────────────────
+
+    @staticmethod
+    def _normalize_participant(name: str) -> str:
+        """Normalise un identifiant pour une comparaison tolérante."""
+        return "".join(ch for ch in str(name).lower() if ch.isalnum())
+
+    def _sanity_check(self, verdict: Verdict, debate: Debate) -> None:
+        """
+        Vérifie que le verdict reste ancré dans le débat réellement tenu.
+
+        Troisième couche de défense contre l'injection de prompt du verdict,
+        après la séparation instructions/données et la délimitation. Elle ne
+        protège pas le synthétiseur : elle détecte APRÈS COUP qu'il a produit
+        quelque chose qui ne correspond pas au débat — notamment des camps
+        attribués à des participants qui n'existent pas.
+
+        SIGNAL, PAS BLOCAGE. Un verdict n'est pas invalidé sur cette base : les
+        LLMs orthographient les identifiants de façon approximative, et rejeter
+        sur ce critère produirait surtout des faux positifs. La comparaison est
+        donc volontairement tolérante (casse et ponctuation ignorées), et
+        l'anomalie est journalisée pour supervision.
+
+        Aucune valeur citée n'est journalisée : elles proviennent du LLM et
+        peuvent porter du contenu de débat. Seuls des comptes le sont.
+        """
+        known = {
+            self._normalize_participant(p.id) for p in debate.participants
+        } | {
+            self._normalize_participant(getattr(p, "model_id", ""))
+            for p in debate.participants
+        }
+        known.discard("")
+        if not known:
+            return
+
+        unknown = 0
+        for divergence in verdict.divergence_points or []:
+            if not isinstance(divergence, dict):
+                continue
+            for camp_key in ("camp_a", "camp_b"):
+                camp = divergence.get(camp_key)
+                if not isinstance(camp, dict):
+                    continue
+                cited = camp.get("participants") or []
+                if isinstance(cited, str):
+                    cited = [cited]
+                for name in cited:
+                    if self._normalize_participant(name) not in known:
+                        unknown += 1
+
+        if unknown:
+            logger.warning(
+                f"⚠ Verdict : {unknown} participant(s) cité(s) absent(s) du débat "
+                f"({len(known)} identifiants connus). Peut signaler une "
+                f"manipulation du synthétiseur — verdict conservé, à superviser."
+            )
 
     # ─── Helpers ─────────────────────────────────────────────
 
