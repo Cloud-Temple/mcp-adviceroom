@@ -81,6 +81,8 @@ class ModelConfig:
     context_window: int = 128000
     default: bool = False                # Modèle par défaut de la catégorie
     active: bool = True                  # Désactivable par l'admin
+    supports_temperature: bool = True    # False pour les modèles qui rejettent le paramètre (ex: claude-opus-5, gpt-5.6-terra)
+    extra_params: Dict[str, Any] = field(default_factory=dict)  # Fusionnés tels quels dans le payload provider (ex: {"reasoning_effort": "none"})
 
     @property
     def supports_tools(self) -> bool:
@@ -93,6 +95,15 @@ class ModelConfig:
     @property
     def supports_streaming(self) -> bool:
         return "streaming" in self.capabilities
+
+    def resolve_temperature(self, temperature: float) -> Optional[float]:
+        """
+        Température à envoyer au provider pour ce modèle.
+
+        None => omettre le champ "temperature" du payload (certains modèles
+        le rejettent explicitement plutôt que d'accepter n'importe quelle valeur).
+        """
+        return temperature if self.supports_temperature else None
 
 
 # ============================================================
@@ -118,9 +129,10 @@ class BaseLLMProvider(ABC):
         self,
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
-        temperature: float = 0.7,
+        temperature: Optional[float] = 0.7,
         max_tokens: Optional[int] = None,
         model_override: Optional[str] = None,
+        extra_params: Optional[Dict[str, Any]] = None,
     ) -> LLMResponse:
         """
         Chat completion non-streaming.
@@ -128,9 +140,12 @@ class BaseLLMProvider(ABC):
         Args:
             messages: Messages au format OpenAI.
             tools: Tool definitions au format OpenAI function calling.
-            temperature: Température de génération (0.0-2.0).
+            temperature: Température de génération (0.0-2.0). None = omettre
+                le champ (modèle qui ne supporte pas ce paramètre).
             max_tokens: Limite de tokens en sortie.
             model_override: Force un modèle spécifique (sinon défaut du provider).
+            extra_params: Paramètres additionnels fusionnés tels quels dans le
+                payload (ex: {"reasoning_effort": "none"}), selon ModelConfig.extra_params.
 
         Returns:
             LLMResponse normalisée.
@@ -142,9 +157,10 @@ class BaseLLMProvider(ABC):
         self,
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
-        temperature: float = 0.7,
+        temperature: Optional[float] = 0.7,
         max_tokens: Optional[int] = None,
         model_override: Optional[str] = None,
+        extra_params: Optional[Dict[str, Any]] = None,
     ) -> AsyncGenerator[LLMStreamChunk, None]:
         """
         Chat completion streaming.

@@ -94,6 +94,8 @@ class LLMRouter:
                 context_window=model_cfg.get("context_window", 128000),
                 default=model_cfg.get("default", False),
                 active=model_cfg.get("active", True),
+                supports_temperature=model_cfg.get("supports_temperature", True),
+                extra_params=model_cfg.get("extra_params", {}) or {},
             )
 
         # Instancier les providers
@@ -245,9 +247,10 @@ class LLMRouter:
         return await provider.chat_completion(
             messages=messages,
             tools=tools,
-            temperature=temperature,
+            temperature=model.resolve_temperature(temperature),
             max_tokens=max_tokens,
             model_override=model.api_model_id,
+            extra_params=model.extra_params,
         )
 
     async def chat_completion_stream(
@@ -291,9 +294,10 @@ class LLMRouter:
         async for chunk in provider.chat_completion_stream(
             messages=messages,
             tools=tools,
-            temperature=temperature,
+            temperature=model.resolve_temperature(temperature),
             max_tokens=max_tokens,
             model_override=model.api_model_id,
+            extra_params=model.extra_params,
         ):
             yield chunk
 

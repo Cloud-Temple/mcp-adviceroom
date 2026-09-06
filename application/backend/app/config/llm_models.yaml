@@ -13,6 +13,13 @@
 #
 # Capabilities :
 #   chat, tools, vision, streaming
+#
+# Autres champs optionnels :
+#   supports_temperature — false pour les modèles qui rejettent le
+#                           paramètre "temperature" (ex: claude-opus-5,
+#                           gpt-5.6-terra). Défaut : true.
+#   extra_params          — dict fusionné tel quel dans le payload envoyé
+#                           au provider (ex: reasoning_effort). Défaut : {}.
 # ============================================================
 
 # Catégorie par défaut
@@ -71,6 +78,40 @@ models:
     active: true
 
   # === OpenAI ===
+  gpt-56-terra:
+    display_name: "GPT-5.6 Terra"
+    provider: openai
+    category: openai
+    api_model_id: "gpt-5.6-terra"
+    capabilities: [chat, tools, streaming]
+    context_window: 1000000  # hypothèse alignée sur gpt-54, à confirmer
+    # ATTENTION — les deux réglages ci-dessous sont COUPLÉS. Mesuré le 06/09/2026
+    # sur /v1/chat/completions (voir le détail dans les notes de la memory bank) :
+    #
+    #   reasoning_effort   temperature   tools   résultat
+    #   (absent)           0.7           oui     400 function tools
+    #   "high" / "low"     omise         oui     400 function tools
+    #   "minimal"          omise         oui     400 valeur non supportée
+    #   "none"             0.0 → 2.0     oui     200 OK
+    #   (absent)           0.7           non     400 temperature
+    #   "high"             omise         non     200 OK
+    #
+    # Autrement dit : c'est reasoning_effort="none" qui débloque À LA FOIS les
+    # function tools ET le paramètre temperature. Retirer reasoning_effort
+    # casserait donc aussi la temperature — ne pas toucher l'un sans l'autre.
+    # Verrouillé par test_gpt_56_terra_carries_its_api_constraints.
+    supports_temperature: true
+    extra_params:
+      # OBLIGATOIRE et doit valoir exactement "none". AdviceRoom passe TOUJOURS
+      # les tools (cf. orchestrator._run_single_turn), donc toute valeur de
+      # raisonnement active ("low", "medium", "high", "xhigh") casserait 100%
+      # des appels à ce modèle. Contrepartie assumée : raisonnement désactivé.
+      # Le tool calling reste fonctionnel malgré cela (round-trip 4 étapes
+      # vérifié en réel le 06/09/2026).
+      reasoning_effort: "none"
+    default: true
+    active: true
+
   gpt-54:
     display_name: "GPT-5.4"
     provider: openai
@@ -78,10 +119,21 @@ models:
     api_model_id: "gpt-5.4"
     capabilities: [chat, tools, streaming]
     context_window: 1000000
-    default: true
+    default: false
     active: true
 
   # === Anthropic ===
+  claude-opus-5:
+    display_name: "Claude Opus 5"
+    provider: anthropic
+    category: anthropic
+    api_model_id: "claude-opus-5"
+    capabilities: [chat, tools, streaming]
+    context_window: 200000  # hypothèse alignée sur claude-opus-46, à confirmer
+    supports_temperature: false  # le paramètre "temperature" est déprécié pour ce modèle (HTTP 400)
+    default: true
+    active: true
+
   claude-opus-46:
     display_name: "Claude Opus 4-6"
     provider: anthropic
@@ -89,7 +141,7 @@ models:
     api_model_id: "claude-opus-4-6"
     capabilities: [chat, tools, streaming]
     context_window: 200000
-    default: true
+    default: false
     active: true
 
   # === Google ===
