@@ -3,8 +3,8 @@
 > Débats structurés entre LLMs hétérogènes — Serveur MCP + Application Web
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-234-brightgreen)]()
-[![Version](https://img.shields.io/badge/Version-0.3.0-blue)]()
+[![Tests](https://img.shields.io/badge/Tests-244-brightgreen)]()
+[![Version](https://img.shields.io/badge/Version-0.3.1-blue)]()
 
 [🇬🇧 English version](README.en.md)
 
@@ -336,7 +336,7 @@ Les débats multi-LLM prennent du temps — chaque LLM doit répondre à chaque 
 - **Isolation multi-tenant** : chaque débat est associé à son créateur (`owner`). Les tokens non-admin ne voient que leurs propres débats (read = ses débats, write = ses débats + créer, admin = tout). 11 endpoints protégés
 - **Signalement d'une vulnérabilité** : voir [SECURITY.md](SECURITY.md). N'ouvrez pas d'issue publique — utilisez le signalement privé GitHub
 - **Audit V1.1 (22/04/2026)** : 22 findings, 19 corrigés, 2 partiels mineurs ([rapport](DESIGN/SECURITY_AUDIT_V1.md))
-- **Audit du 24/08/2026** : 4 CRITICAL et 5 HIGH identifiés. **8 sur 9 corrigés** en 0.3.0 (clé de bootstrap devinable, XSS stocké console, clé Google en query string, résurrection de tokens révoqués, absence de rate limiting, secrets en clair dans le repr, XSS de l'export HTML). Reste l'injection de prompt du verdict, traitée en défense en profondeur — voir ci-dessous
+- **Audit du 24/08/2026** : 4 CRITICAL et 5 HIGH identifiés. **9 sur 9 traités** — 8 corrigés en 0.3.0 (clé de bootstrap devinable, XSS stocké console, clé Google en query string, résurrection de tokens révoqués, absence de rate limiting, secrets en clair dans le repr, XSS de l'export HTML), et l'injection de prompt du verdict **atténuée** en 0.3.1 par défense en profondeur — sans être refermable, voir ci-dessous
 - **Auth** : Bearer Token + ContextVar sur toutes les routes REST et MCP
 - **Validation** : UUID regex, longueurs, bornes, whitelists
 - **Infra** : Dockerfile non-root (UID 1001), ports internes only, HSTS, security headers
