@@ -3,8 +3,8 @@
 > Structured debates between heterogeneous LLMs — MCP Server + Web Application
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-234-brightgreen)]()
-[![Version](https://img.shields.io/badge/Version-0.3.0-blue)]()
+[![Tests](https://img.shields.io/badge/Tests-244-brightgreen)]()
+[![Version](https://img.shields.io/badge/Version-0.3.1-blue)]()
 
 [🇫🇷 Version française](README.md)
 
@@ -335,7 +335,7 @@ Multi-LLM debates take time — each LLM must respond at each round. The MCP tim
 - **Multi-tenant isolation**: each debate is tied to its creator (`owner`). Non-admin tokens only see their own debates (read = own debates, write = own debates + create, admin = everything). 11 endpoints protected
 - **Reporting a vulnerability**: see [SECURITY.md](SECURITY.md). Do not open a public issue — use GitHub private vulnerability reporting
 - **V1.1 audit (2026-04-22)**: 22 findings, 19 fixed, 2 minor partials ([report](DESIGN/SECURITY_AUDIT_V1.md))
-- **2026-08-24 audit**: 4 CRITICAL and 5 HIGH identified. **8 of 9 fixed** in 0.3.0 (guessable bootstrap key, stored XSS in the console, Google key in the query string, revoked-token resurrection, missing rate limiting, secrets in plaintext in the repr, XSS in the HTML export). The verdict prompt injection remains, handled as defence in depth — see below
+- **2026-08-24 audit**: 4 CRITICAL and 5 HIGH identified. **9 of 9 addressed** — 8 fixed in 0.3.0 (guessable bootstrap key, stored XSS in the console, Google key in the query string, revoked-token resurrection, missing rate limiting, secrets in plaintext in the repr, XSS in the HTML export), and the verdict prompt injection **mitigated** in 0.3.1 through defence in depth — not closable, see below
 - **Auth**: Bearer Token + ContextVar on all REST and MCP routes
 - **Validation**: UUID regex, length limits, bounds, whitelists
 - **Infra**: Non-root Dockerfile (UID 1001), internal ports only, HSTS, security headers
